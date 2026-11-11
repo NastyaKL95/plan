@@ -17,6 +17,7 @@
 - `solutions/` — код решений на Python 3
 - `tests/` — простые тесты
 - `podgotovka-12h/` — **интенсив на 12 часов**: презентации, практика, бонусы для быстрых
+- `office/` — **Word (.docx) и PowerPoint (.pptx)** для печати и показа
 
 Каждая задача — **100 баллов**. Ограничения по времени/памяти: 1 с / 64 MB.
 
@@ -29,3 +30,16 @@
 - обзорная HTML-презентация `podgotovka-12h/prezentaciya-obzor.html`;
 - практика `praktika/` и доп. задачи `bonus/`;
 - шпаргалка ученику `razdatochnyj-material.pdf`.
+
+### Word и PowerPoint (`office/`)
+
+| Файл | Назначение |
+|------|------------|
+| `Zadaniya_olimpiada.docx` | Условия комплекта |
+| `Resheniya_olimpiada.docx` | Разбор |
+| `Programma_12_chasov.docx` | Программа 12 часов |
+| `Shpargalka_ucheniku.docx` | Шпаргалка |
+| `Praktika_i_bonusy.docx` | Практика и бонусы |
+| `Otvety.docx` | Ответы |
+| `Prezentaciya_podgotovka_12h.pptx` | Презентация интенсива |
+| `Prezentaciya_zadaniya_komplekt.pptx` | Презентация по 4 задачам |

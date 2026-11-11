@@ -24,6 +24,9 @@
 - `otvety-i-razbory.md` — ответы и краткие разборы
 - `solutions/` — код к ключевым задачам
 - `razdatochnyj-material.pdf` — краткая шпаргалка ученику
+- Word/PowerPoint — в соседней папке [`../office/`](../office/):
+  - `Programma_12_chasov.docx`, `Shpargalka_ucheniku.docx`, `Praktika_i_bonusy.docx`, `Otvety.docx`
+  - `Prezentaciya_podgotovka_12h.pptx` (интенсив), `Prezentaciya_zadaniya_komplekt.pptx` (комплект задач)
 
 ## Как вести занятие
 
