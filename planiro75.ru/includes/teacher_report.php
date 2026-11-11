@@ -462,26 +462,45 @@ function planner_teacher_report_tasks(int $orgId, int $userId, int $year): array
     if (planner_table_has_column('tasks', 'work_hours')) {
         $extra .= ', t.work_hours';
     }
+    $assistantSql = '';
+    if (planner_table_exists('task_participants')) {
+        $assistantSql = ' OR EXISTS (
+            SELECT 1 FROM task_participants tp
+            WHERE tp.task_id = t.id AND tp.user_id = ? AND tp.role = \'assistant\'
+        )';
+    }
     $st = db()->prepare(
-        'SELECT t.id, t.title, t.description, t.due_date, t.status,
+        'SELECT t.id, t.title, t.description, t.due_date, t.status, t.assignee_id, t.author_id,
                 t.work_edu, t.work_edu_method, t.work_research, t.work_org_method,
                 t.work_period, t.work_indicator, t.work_hours_first, t.work_hours_second'
         . $extra . '
          FROM tasks t
          WHERE t.organization_id = ?
            AND t.status <> \'cancelled\'
-           AND (t.assignee_id = ? OR (t.assignee_id IS NULL AND t.author_id = ?))
+           AND (t.assignee_id = ? OR (t.assignee_id IS NULL AND t.author_id = ?)' . $assistantSql . ')
            AND (t.work_edu = 1 OR t.work_edu_method = 1 OR t.work_research = 1 OR t.work_org_method = 1)'
         . $yearSql
         . ' ORDER BY (t.due_date IS NULL), t.due_date, t.id'
     );
     $params = [$orgId, $userId, $userId];
+    if ($assistantSql !== '') {
+        $params[] = $userId;
+    }
     if ($yearSql !== '') {
         $params[] = $year;
     }
     $st->execute($params);
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as &$row) {
+        $assigneeId = (int) ($row['assignee_id'] ?? 0);
+        $authorId = (int) ($row['author_id'] ?? 0);
+        if ($assigneeId !== $userId && !($assigneeId === 0 && $authorId === $userId)) {
+            $row['report_role'] = 'соисполнитель';
+        }
+    }
+    unset($row);
 
-    return $st->fetchAll(PDO::FETCH_ASSOC);
+    return $rows;
 }
 
 function planner_teacher_report_subject(int $orgId, int $userId): ?array
@@ -572,6 +591,11 @@ function planner_teacher_report_task_title(array $task): string
             $description = mb_substr($description, 0, 400, 'UTF-8') . '…';
         }
         $title .= "\n" . $description;
+    }
+
+    $role = trim((string) ($task['report_role'] ?? ''));
+    if ($role !== '') {
+        $title .= "\n" . $role;
     }
 
     return $title !== '' ? $title : 'Без названия';
