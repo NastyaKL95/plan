@@ -492,6 +492,28 @@ function planner_reports_visibility_level(array $user): string
 }
 
 /**
+ * Подразделения, по которым пользователь видит отчёт «своего отдела».
+ *
+ * @return list<int>
+ */
+function planner_reports_department_ids(array $user): array
+{
+    $ids = array_values(array_unique(array_merge(
+        user_managed_department_ids($user),
+        user_administered_department_ids($user)
+    )));
+    if ($ids === [] && (($user['role'] ?? '') === 'head')) {
+        $fallback = user_visible_department_ids($user);
+        $ids = ($fallback !== null && $fallback !== []) ? $fallback : user_department_membership_ids($user);
+    }
+
+    return array_values(array_unique(array_filter(
+        array_map('intval', $ids),
+        static fn (int $id): bool => $id > 0
+    )));
+}
+
+/**
  * Ограничение задач в отчётах (таблица tasks t; при department/org — join projects p).
  *
  * @return array{sql: string, params: array}
@@ -506,14 +528,7 @@ function planner_reports_tasks_scope(array $user, bool $hasProjectDept, string $
         if (!$hasProjectDept) {
             return ['sql' => '', 'params' => []];
         }
-        $ids = array_values(array_unique(array_merge(
-            user_managed_department_ids($user),
-            user_administered_department_ids($user)
-        )));
-        if ($ids === [] && (($user['role'] ?? '') === 'head')) {
-            $fallback = user_visible_department_ids($user);
-            $ids = ($fallback !== null && $fallback !== []) ? $fallback : user_department_membership_ids($user);
-        }
+        $ids = planner_reports_department_ids($user);
         if ($ids === []) {
             return ['sql' => ' AND 1=0 ', 'params' => []];
         }

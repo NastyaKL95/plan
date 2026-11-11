@@ -5,6 +5,7 @@ require_once dirname(__DIR__) . '/includes/bootstrap.php';
 require_login();
 require_once __DIR__ . '/api/_guard.php';
 require_once dirname(__DIR__) . '/includes/task_extras.php';
+require_once dirname(__DIR__) . '/includes/reports_efficiency.php';
 
 $hasProjectDept = planner_table_has_column('projects', 'department_id');
 $scope = planner_reports_tasks_scope($user, $hasProjectDept, 'p');
@@ -61,26 +62,8 @@ $score = static function (array $r) use ($normRate): float {
 
 if ($mode === 'employees') {
     fputcsv($out, ['Сотрудник', 'Отдел', 'Создано', 'Закрыто', 'В срок, %', 'Активные', 'Просроченные', 'Сред. закрытие, ч', 'Индекс'], ';');
-    $sql = "SELECT
-        u.name AS user_name,
-        d.name AS department_name,
-        SUM(CASE WHEN t.created_at >= $rangeExpr THEN 1 ELSE 0 END) AS created_total,
-        SUM(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr THEN 1 ELSE 0 END) AS done_total,
-        SUM(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr
-            AND (t.due_date IS NULL OR t.updated_at <= t.due_date) THEN 1 ELSE 0 END) AS done_in_time,
-        SUM(CASE WHEN t.status NOT IN ('done','cancelled') THEN 1 ELSE 0 END) AS active_total,
-        SUM(CASE WHEN t.status NOT IN ('done','cancelled') AND t.due_date IS NOT NULL AND t.due_date < NOW() THEN 1 ELSE 0 END) AS overdue_active,
-        AVG(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr THEN TIMESTAMPDIFF(HOUR, t.created_at, t.updated_at) END) AS avg_close_hours
-    FROM tasks t
-    INNER JOIN projects p ON p.id = t.project_id
-    LEFT JOIN users u ON u.id = t.assignee_id
-    LEFT JOIN departments d ON d.id = p.department_id
-    WHERE t.organization_id = ?" . $scope['sql'] . $tw['sql'] . "
-    GROUP BY u.id, u.name, d.name
-    ORDER BY overdue_active DESC, active_total DESC, user_name ASC";
-    $st = db()->prepare($sql);
-    $st->execute($params);
-    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+    $rows = planner_reports_efficiency_employees($orgId, $user, $rangeExpr, $scope, $tw);
+    foreach ($rows as $r) {
         $onTime = $normRate((int) $r['done_in_time'], (int) $r['done_total']);
         fputcsv($out, [
             (string) ($r['user_name'] ?? 'Без исполнителя'),
