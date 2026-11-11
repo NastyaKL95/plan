@@ -367,6 +367,24 @@
     });
   }
 
+  function projectBelongsToMyDepartment(p) {
+    if (!p) return false;
+    var mine = userDepartmentIds(currentUserRecord());
+    if (!mine.length) return false;
+    var did = parseInt(p.department_id, 10);
+    return did > 0 && mine.indexOf(did) >= 0;
+  }
+
+  function sortProjectsForPicker(list) {
+    var mine = [];
+    var rest = [];
+    (list || []).forEach(function (p) {
+      if (projectBelongsToMyDepartment(p)) mine.push(p);
+      else rest.push(p);
+    });
+    return mine.concat(rest);
+  }
+
   function userOptionHtml(u) {
     return '<option value="' + u.id + '">' + escapeHtml(userPickerLabel(u)) + '</option>';
   }
@@ -543,7 +561,7 @@
         chips.innerHTML += '<span class="participant-picker-chip">+' + (selected.length - 3) + '</span>';
       }
     }
-    var sourceList = role === 'project' ? projects : users;
+    var sourceList = role === 'project' ? sortProjectsForPicker(projects) : users;
     if (role === 'assignee' || role === 'assistants') {
       var keepIds = [];
       if (role === 'assignee') {

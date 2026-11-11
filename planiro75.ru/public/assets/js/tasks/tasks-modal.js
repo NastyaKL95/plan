@@ -1164,7 +1164,8 @@
   function defaultProjectIdForCreate() {
     var fp = $('filterProject');
     if (fp && fp.value) return parseInt(fp.value, 10);
-    if (projects.length) return parseInt(projects[0].id, 10);
+    var ordered = sortProjectsForPicker(projects);
+    if (ordered.length) return parseInt(ordered[0].id, 10);
     return null;
   }
 

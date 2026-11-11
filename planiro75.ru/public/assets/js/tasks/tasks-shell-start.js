@@ -320,6 +320,7 @@
       myPlanStagesFeature = !!(mps && mps.feature);
       var fp = $('filterProject');
       var fProj = $('fProject');
+      var orderedProjects = sortProjectsForPicker(projects);
       function projLabel(p) {
         var dn = p.department_name ? p.department_name + ' — ' : '';
         return dn + p.name;
@@ -327,7 +328,7 @@
       if (fp) {
         fp.innerHTML =
           '<option value="">Все проекты</option>' +
-          projects
+          orderedProjects
             .map(function (p) {
               return '<option value="' + p.id + '">' + escapeHtml(projLabel(p)) + '</option>';
             })
@@ -340,7 +341,7 @@
         }
       }
       if (fProj) {
-        fProj.innerHTML = projects
+        fProj.innerHTML = orderedProjects
           .map(function (p) {
             return '<option value="' + p.id + '">' + escapeHtml(projLabel(p)) + '</option>';
           })
@@ -409,25 +410,25 @@
       }
       syncSavedViewScopeUi();
       var qtp = $('quickTaskProject');
-      if (qtp && projects.length) {
-        qtp.innerHTML = projects
+      if (qtp && orderedProjects.length) {
+        qtp.innerHTML = orderedProjects
           .map(function (p) {
             return '<option value="' + p.id + '">' + escapeHtml(projLabel(p)) + '</option>';
           })
           .join('');
         try {
           var sdp = localStorage.getItem('planner_quick_default_project');
-          if (sdp && projects.some(function (p) {
+          if (sdp && orderedProjects.some(function (p) {
             return String(p.id) === sdp;
           })) {
             qtp.value = sdp;
           } else if (fProj && fProj.value) {
             qtp.value = fProj.value;
           } else {
-            qtp.value = String(projects[0].id);
+            qtp.value = String(orderedProjects[0].id);
           }
         } catch (eQtp) {
-          qtp.value = String(projects[0].id);
+          qtp.value = String(orderedProjects[0].id);
         }
       }
       var qta = $('quickTaskAssignee');

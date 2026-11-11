@@ -108,9 +108,27 @@
     users = users || [];
     var autoProj = $('autoProject');
     if (autoProj) {
+      var meId = String(window.__PLANNER_USER_ID__ || '');
+      var myDeptIds = [];
+      users.forEach(function (u) {
+        if (String(u.id) !== meId) return;
+        (u.department_ids || []).forEach(function (id) {
+          var n = parseInt(id, 10);
+          if (n > 0 && myDeptIds.indexOf(n) < 0) myDeptIds.push(n);
+        });
+        var primaryDept = parseInt(u.department_id, 10);
+        if (primaryDept > 0 && myDeptIds.indexOf(primaryDept) < 0) myDeptIds.push(primaryDept);
+      });
+      var deptProjects = [];
+      var otherProjects = [];
+      projects.forEach(function (p) {
+        var did = parseInt(p.department_id, 10);
+        if (did > 0 && myDeptIds.indexOf(did) >= 0) deptProjects.push(p);
+        else otherProjects.push(p);
+      });
       autoProj.innerHTML =
         '<option value="">Все проекты</option>' +
-        projects
+        deptProjects.concat(otherProjects)
           .map(function (p) {
             return '<option value="' + p.id + '">' + escapeHtml(projLabel(p)) + '</option>';
           })
