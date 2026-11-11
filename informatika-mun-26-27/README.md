@@ -35,11 +35,12 @@
 
 | Файл | Назначение |
 |------|------------|
+| `Temy_podrobno.docx` | Подробное описание тем (что / зачем / как) |
 | `Zadaniya_olimpiada.docx` | Условия комплекта |
 | `Resheniya_olimpiada.docx` | Разбор |
 | `Programma_12_chasov.docx` | Программа 12 часов |
-| `Shpargalka_ucheniku.docx` | Шпаргалка |
+| `Shpargalka_ucheniku.docx` | Шпаргалка с пояснениями |
 | `Praktika_i_bonusy.docx` | Практика и бонусы |
 | `Otvety.docx` | Ответы |
-| `Prezentaciya_podgotovka_12h.pptx` | Презентация интенсива |
+| `Prezentaciya_podgotovka_12h.pptx` | Подробная презентация интенсива |
 | `Prezentaciya_zadaniya_komplekt.pptx` | Презентация по 4 задачам |

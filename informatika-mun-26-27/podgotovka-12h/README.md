@@ -23,10 +23,12 @@
 - `bonus/` — доп. задачи для тех, кто решает быстрее
 - `otvety-i-razbory.md` — ответы и краткие разборы
 - `solutions/` — код к ключевым задачам
+- `temy-podrobno.md` — **подробное описание тем** простым языком (что / зачем / как)
 - `razdatochnyj-material.pdf` — краткая шпаргалка ученику
 - Word/PowerPoint — в соседней папке [`../office/`](../office/):
+  - `Temy_podrobno.docx` — главное для понятного объяснения тем
   - `Programma_12_chasov.docx`, `Shpargalka_ucheniku.docx`, `Praktika_i_bonusy.docx`, `Otvety.docx`
-  - `Prezentaciya_podgotovka_12h.pptx` (интенсив), `Prezentaciya_zadaniya_komplekt.pptx` (комплект задач)
+  - `Prezentaciya_podgotovka_12h.pptx` (подробный интенсив), `Prezentaciya_zadaniya_komplekt.pptx`
 
 ## Как вести занятие
 
