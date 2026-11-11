@@ -3722,52 +3722,64 @@ a:hover {
 
 .teacher-report-form {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-  align-items: end;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3) var(--space-4);
 }
 
-.teacher-report-form label {
+.teacher-report-actions {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 0.85rem;
+  margin-top: var(--space-4);
 }
 
-.teacher-report-form .teacher-report-actions {
-  display: flex;
-  align-items: end;
+@media (max-width: 640px) {
+  .teacher-report-form,
+  .task-work-hours {
+    grid-template-columns: 1fr;
+  }
+}
+
+.task-work-row {
+  align-items: start;
+}
+
+.task-work-row .task-modal-meta-ico {
+  margin-top: 3px;
+}
+
+.task-work-row .task-modal-meta-key {
+  margin-top: 2px;
 }
 
 .task-work-kinds {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
 }
 
-.task-work-kinds label {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-}
-
-.task-work-field {
+.task-modal-meta-val label.task-work-field {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 4px;
-  font-size: 0.85rem;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--muted);
 }
 
 .task-work-hours {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .task-work-hint {
-  margin: 2px 0 4px;
-  color: var(--muted, #667);
-  font-size: 0.8rem;
+  margin: 6px 0 2px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.4;
 }
 
 .report-chart-meta {

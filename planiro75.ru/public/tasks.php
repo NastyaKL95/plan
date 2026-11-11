@@ -425,18 +425,18 @@ window.__PLANNER_USER_DEPT_ID__=<?= json_encode(isset($user['department_id']) &&
               <label><input type="checkbox" id="fWorkResearch"> Научно-исследовательская работа</label>
               <label><input type="checkbox" id="fWorkOrgMethod"> Организационно-методическая работа</label>
               <p class="task-work-hint">Отмеченные виды попадут в индивидуальный план/отчёт. Можно отметить несколько.</p>
-              <label class="task-work-field">Сроки выполнения
-                <input type="text" id="fWorkPeriod" maxlength="160" placeholder="Март 2026 или Январь–декабрь" autocomplete="off">
+              <label class="task-work-field" for="fWorkPeriod">Сроки выполнения
+                <input type="text" class="task-modal-meta-input" id="fWorkPeriod" maxlength="160" placeholder="Март 2026 или Январь–декабрь" autocomplete="off">
               </label>
-              <label class="task-work-field">Показатель выполнения
-                <input type="text" id="fWorkIndicator" maxlength="255" placeholder="кол-во чел., п. л., стр." autocomplete="off">
+              <label class="task-work-field" for="fWorkIndicator">Показатель выполнения
+                <input type="text" class="task-modal-meta-input" id="fWorkIndicator" maxlength="255" placeholder="кол-во чел., п. л., стр." autocomplete="off">
               </label>
               <div class="task-work-hours">
-                <label class="task-work-field">Часы, 1 полугодие
-                  <input type="text" inputmode="decimal" id="fWorkHoursH1" maxlength="12" placeholder="0" autocomplete="off">
+                <label class="task-work-field" for="fWorkHoursH1">Часы, 1 полугодие
+                  <input type="text" class="task-modal-meta-input" inputmode="decimal" id="fWorkHoursH1" maxlength="12" placeholder="0" autocomplete="off">
                 </label>
-                <label class="task-work-field">Часы, 2 полугодие
-                  <input type="text" inputmode="decimal" id="fWorkHoursH2" maxlength="12" placeholder="0" autocomplete="off">
+                <label class="task-work-field" for="fWorkHoursH2">Часы, 2 полугодие
+                  <input type="text" class="task-modal-meta-input" inputmode="decimal" id="fWorkHoursH2" maxlength="12" placeholder="0" autocomplete="off">
                 </label>
               </div>
             </div>

@@ -33,6 +33,7 @@ layout_start($user, 'Отчёты', 'reports');
   <a class="btn btn-primary" href="<?= htmlspecialchars(planner_url('/reports_efficiency.php'), ENT_QUOTES, 'UTF-8') ?>">Эффективность сотрудников и отделов</a>
 </div>
 
+<div class="reports-grid">
 <section class="report-card report-card--wide" id="teacherReportSection">
   <h2>Индивидуальный план/отчёт преподавателя</h2>
   <p class="muted report-lead-stuck">Word-файл в том же виде, что образец: шапка, сводка часов и четыре раздела работ. В карточке задачи отметьте вид работы, сроки, показатель и часы по полугодиям. В отчёт попадают задачи сотрудника за текущий год плана, кроме отменённых.</p>
@@ -41,10 +42,12 @@ layout_start($user, 'Отчёты', 'reports');
   <?php elseif ($teacherReportUsers === []): ?>
   <p class="muted">Нет сотрудников, для которых можно собрать отчёт.</p>
   <?php else: ?>
-  <form class="teacher-report-form" method="post" action="<?= htmlspecialchars(planner_url('/reports_teacher.php'), ENT_QUOTES, 'UTF-8') ?>">
+  <form method="post" action="<?= htmlspecialchars(planner_url('/reports_teacher.php'), ENT_QUOTES, 'UTF-8') ?>">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(planner_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
-    <label>Сотрудник
-      <select name="user_id" id="teacherReportUser" required>
+    <div class="teacher-report-form">
+    <div>
+    <label class="field-label" for="teacherReportUser">Сотрудник</label>
+      <select class="input-block" name="user_id" id="teacherReportUser" required>
         <?php foreach ($teacherReportUsers as $row): ?>
           <?php
             $optLabel = (string) ($row['name'] ?? '');
@@ -66,28 +69,36 @@ layout_start($user, 'Отчёты', 'reports');
           ><?= htmlspecialchars($optLabel, ENT_QUOTES, 'UTF-8') ?></option>
         <?php endforeach; ?>
       </select>
-    </label>
-    <label>Должность
-      <input type="text" name="job_title" id="teacherReportJob" maxlength="160" autocomplete="off">
-    </label>
-    <label>Ученая степень
-      <input type="text" name="academic_degree" id="teacherReportDegree" maxlength="120" autocomplete="off">
-    </label>
-    <label>Ученое звание
-      <input type="text" name="academic_rank" id="teacherReportRank" maxlength="120" autocomplete="off">
-    </label>
-    <label>План, учебная работа
-      <input type="text" name="plan_hours_edu" id="teacherReportPlanEdu" inputmode="decimal" maxlength="12" autocomplete="off">
-    </label>
-    <label>План, учебно-методическая
-      <input type="text" name="plan_hours_edu_method" id="teacherReportPlanEduMethod" inputmode="decimal" maxlength="12" autocomplete="off">
-    </label>
-    <label>План, научно-исследовательская
-      <input type="text" name="plan_hours_research" id="teacherReportPlanResearch" inputmode="decimal" maxlength="12" autocomplete="off">
-    </label>
-    <label>План, организационно-методическая
-      <input type="text" name="plan_hours_org_method" id="teacherReportPlanOrg" inputmode="decimal" maxlength="12" autocomplete="off">
-    </label>
+    </div>
+    <div>
+      <label class="field-label" for="teacherReportJob">Должность</label>
+      <input class="input-block" type="text" name="job_title" id="teacherReportJob" maxlength="160" autocomplete="off">
+    </div>
+    <div>
+      <label class="field-label" for="teacherReportDegree">Ученая степень</label>
+      <input class="input-block" type="text" name="academic_degree" id="teacherReportDegree" maxlength="120" autocomplete="off">
+    </div>
+    <div>
+      <label class="field-label" for="teacherReportRank">Ученое звание</label>
+      <input class="input-block" type="text" name="academic_rank" id="teacherReportRank" maxlength="120" autocomplete="off">
+    </div>
+    <div>
+      <label class="field-label" for="teacherReportPlanEdu">План, учебная работа</label>
+      <input class="input-block" type="text" name="plan_hours_edu" id="teacherReportPlanEdu" inputmode="decimal" maxlength="12" autocomplete="off">
+    </div>
+    <div>
+      <label class="field-label" for="teacherReportPlanEduMethod">План, учебно-методическая</label>
+      <input class="input-block" type="text" name="plan_hours_edu_method" id="teacherReportPlanEduMethod" inputmode="decimal" maxlength="12" autocomplete="off">
+    </div>
+    <div>
+      <label class="field-label" for="teacherReportPlanResearch">План, научно-исследовательская</label>
+      <input class="input-block" type="text" name="plan_hours_research" id="teacherReportPlanResearch" inputmode="decimal" maxlength="12" autocomplete="off">
+    </div>
+    <div>
+      <label class="field-label" for="teacherReportPlanOrg">План, организационно-методическая</label>
+      <input class="input-block" type="text" name="plan_hours_org_method" id="teacherReportPlanOrg" inputmode="decimal" maxlength="12" autocomplete="off">
+    </div>
+    </div>
     <div class="teacher-report-actions">
       <button type="submit" class="btn btn-primary">Скачать Word</button>
     </div>
@@ -95,7 +106,6 @@ layout_start($user, 'Отчёты', 'reports');
   <?php endif; ?>
 </section>
 
-<div class="reports-grid">
   <section class="report-card report-card--wide" id="quickTasksReportSection" hidden>
     <h2>Мелкие быстрые задачи по датам</h2>
     <p class="muted report-lead-stuck">За последние 14 дней, в вашей зоне видимости. Сотрудники отмечают такие карточки кнопкой «Быстро» на странице задач.</p>
