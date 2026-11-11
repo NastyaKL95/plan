@@ -5074,6 +5074,16 @@ a:hover {
   gap: 6px;
 }
 
+.max-check-col {
+  width: 36px;
+}
+
+.max-check-col input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
 .max-status {
   display: inline-block;
   padding: 2px 8px;

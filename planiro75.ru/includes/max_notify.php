@@ -930,17 +930,15 @@ function planner_max_retry_failed_events(int $orgId, int $limit = 100): int
 }
 
 /**
- * @return array{total:int,items:array<int,array<string,mixed>>}
+ * @return array{0:list<string>,1:list<mixed>}
  */
-function planner_max_queue_list(int $orgId, string $status = '', string $eventType = '', string $userQuery = '', int $limit = 100): array
+function planner_max_queue_filters(int $orgId, string $status, string $eventType, string $userQuery): array
 {
-    if (!planner_max_events_table_ready()) {
-        return ['total' => 0, 'items' => []];
-    }
-    $limit = max(1, min(500, $limit));
     $where = ['ne.organization_id = ?'];
     $params = [$orgId];
-    if ($status !== '' && in_array($status, ['pending', 'sent', 'failed', 'cancelled'], true)) {
+    if ($status === 'except_sent') {
+        $where[] = "ne.status <> 'sent'";
+    } elseif ($status !== '' && $status !== 'all' && in_array($status, ['pending', 'sent', 'failed', 'cancelled'], true)) {
         $where[] = 'ne.status = ?';
         $params[] = $status;
     }
@@ -954,6 +952,20 @@ function planner_max_queue_list(int $orgId, string $status = '', string $eventTy
         $params[] = $like;
         $params[] = $like;
     }
+
+    return [$where, $params];
+}
+
+/**
+ * @return array{total:int,items:array<int,array<string,mixed>>}
+ */
+function planner_max_queue_list(int $orgId, string $status = '', string $eventType = '', string $userQuery = '', int $limit = 100): array
+{
+    if (!planner_max_events_table_ready()) {
+        return ['total' => 0, 'items' => []];
+    }
+    $limit = max(1, min(500, $limit));
+    [$where, $params] = planner_max_queue_filters($orgId, $status, $eventType, $userQuery);
     $wSql = implode(' AND ', $where);
     $stCnt = db()->prepare("SELECT COUNT(*) FROM notification_events ne LEFT JOIN users u ON u.id = ne.user_id WHERE $wSql");
     $stCnt->execute($params);
@@ -1061,6 +1073,107 @@ function planner_max_digest_cancel(int $orgId, int $digestId): bool
     $st->execute([$digestId, $orgId]);
 
     return $st->rowCount() > 0;
+}
+
+/**
+ * @param list<int> $ids
+ * @return array{affected:int,skipped:int}
+ */
+function planner_max_queue_apply_bulk(int $orgId, array $ids, string $action): array
+{
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn (int $id): bool => $id > 0)));
+    if (count($ids) > 1000) {
+        $ids = array_slice($ids, 0, 1000);
+    }
+    if ($orgId <= 0 || $ids === [] || !planner_max_events_table_ready()) {
+        return ['affected' => 0, 'skipped' => 0];
+    }
+    if (!in_array($action, ['delete', 'retry'], true)) {
+        return ['affected' => 0, 'skipped' => count($ids)];
+    }
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    $params = array_merge([$orgId], $ids);
+    if ($action === 'delete') {
+        $st = db()->prepare("DELETE FROM notification_events WHERE organization_id = ? AND id IN ($ph)");
+        $st->execute($params);
+        $affected = $st->rowCount();
+
+        return ['affected' => $affected, 'skipped' => max(0, count($ids) - $affected)];
+    }
+    $st = db()->prepare(
+        "UPDATE notification_events
+         SET status = 'pending', attempts = 0, next_retry_at = NOW(), sent_at = NULL, last_error = NULL
+         WHERE organization_id = ? AND id IN ($ph) AND status IN ('failed', 'cancelled', 'sent')"
+    );
+    $st->execute($params);
+    $affected = $st->rowCount();
+
+    return ['affected' => $affected, 'skipped' => max(0, count($ids) - $affected)];
+}
+
+/**
+ * Действие сразу по всем уведомлениям текущего фильтра, не только по открытой странице.
+ *
+ * @return array{affected:int}
+ */
+function planner_max_queue_apply_filter(int $orgId, string $status, string $eventType, string $userQuery, string $action): array
+{
+    if ($orgId <= 0 || !planner_max_events_table_ready() || !in_array($action, ['delete', 'retry'], true)) {
+        return ['affected' => 0];
+    }
+    [$where, $params] = planner_max_queue_filters($orgId, $status, $eventType, $userQuery);
+    if ($action === 'retry') {
+        $where[] = "ne.status IN ('failed', 'cancelled', 'sent')";
+    }
+    $wSql = implode(' AND ', $where);
+    $idSql = "SELECT ne.id FROM notification_events ne LEFT JOIN users u ON u.id = ne.user_id WHERE $wSql ORDER BY ne.id DESC LIMIT 5000";
+    if ($action === 'delete') {
+        $st = db()->prepare(
+            "DELETE FROM notification_events WHERE organization_id = ? AND id IN (SELECT id FROM ($idSql) picked)"
+        );
+    } else {
+        $st = db()->prepare(
+            "UPDATE notification_events
+             SET status = 'pending', attempts = 0, next_retry_at = NOW(), sent_at = NULL, last_error = NULL
+             WHERE organization_id = ? AND id IN (SELECT id FROM ($idSql) picked)"
+        );
+    }
+    $st->execute(array_merge([$orgId], $params));
+
+    return ['affected' => $st->rowCount()];
+}
+
+/**
+ * @param list<int> $ids
+ */
+function planner_max_digest_cancel_many(int $orgId, array $ids): int
+{
+    if ($orgId <= 0 || !planner_table_exists('max_digest_queue')) {
+        return 0;
+    }
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn (int $id): bool => $id > 0)));
+    if (count($ids) > 1000) {
+        $ids = array_slice($ids, 0, 1000);
+    }
+    if ($ids === []) {
+        return 0;
+    }
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    $st = db()->prepare("DELETE FROM max_digest_queue WHERE organization_id = ? AND id IN ($ph)");
+    $st->execute(array_merge([$orgId], $ids));
+
+    return $st->rowCount();
+}
+
+function planner_max_digest_cancel_all(int $orgId): int
+{
+    if ($orgId <= 0 || !planner_table_exists('max_digest_queue')) {
+        return 0;
+    }
+    $st = db()->prepare('DELETE FROM max_digest_queue WHERE organization_id = ?');
+    $st->execute([$orgId]);
+
+    return $st->rowCount();
 }
 
 /**
