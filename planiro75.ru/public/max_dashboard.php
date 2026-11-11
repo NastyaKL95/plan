@@ -104,6 +104,7 @@ layout_start($user, 'Мониторинг MAX', 'max_dashboard');
 
     <div class="bx-profile-card bx-profile-card--wide">
       <div class="bx-profile-card-title">Очередь уведомлений</div>
+      <p class="muted bx-profile-lead2">Полный журнал с текстом сообщений и кнопками отмены и повтора — на странице <a href="<?= htmlspecialchars(planner_url('/max_notifications.php'), ENT_QUOTES, 'UTF-8') ?>">Уведомления MAX</a>.</p>
       <div class="form-row max-form-row">
         <div>
           <label class="field-label" for="mxFilterStatus">Статус</label>

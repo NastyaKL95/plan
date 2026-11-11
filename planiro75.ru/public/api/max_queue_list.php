@@ -15,4 +15,9 @@ $eventType = trim((string) ($_GET['event_type'] ?? ''));
 $userQ = trim((string) ($_GET['user_q'] ?? ''));
 $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 100;
 $data = planner_max_queue_list($orgId, $status, $eventType, $userQ, $limit);
-json_response(['ok' => true, 'total' => $data['total'], 'items' => $data['items']]);
+json_response([
+    'ok' => true,
+    'total' => $data['total'],
+    'items' => $data['items'],
+    'digest' => planner_max_digest_list($orgId, $limit),
+]);

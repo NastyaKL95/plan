@@ -149,7 +149,7 @@ function planner_notify_task_assignee_email(int $orgId, int $taskId, int $assign
         . "Название: " . $taskTitle . "\n"
         . ($projectName !== '' ? ("Проект: " . $projectName . "\n") : '')
         . "Назначил: " . $actorName . "\n"
-        . "Ссылка: " . planner_url('/tasks.php?open=' . $taskId) . "\n\n"
+        . "Ссылка: " . planner_public_site_url('/tasks.php?open=' . $taskId) . "\n\n"
         . "Это автоматическое уведомление Planner.";
 
     if (planner_mail_queue_push($orgId, $to, $subject, $body, [

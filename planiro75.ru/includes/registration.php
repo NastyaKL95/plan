@@ -361,15 +361,15 @@ function planner_public_site_url(string $path = ''): string
 
         return $path === '' ? $base . $prefix : $base . $prefix . $path;
     }
-    $https = !empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off';
+    $https = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
+        || strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
     $host = trim((string) ($_SERVER['HTTP_HOST'] ?? 'localhost'));
-    $base = ($https ? 'https' : 'http') . '://' . $host . planner_app_root();
-    $base = rtrim($base, '/');
+    $base = ($https ? 'https' : 'http') . '://' . $host . planner_public_path_prefix();
     if ($path === '') {
         return $base;
     }
 
-    return $base . planner_url($path);
+    return $base . $path;
 }
 
 function planner_registration_token_ttl_hours(): int

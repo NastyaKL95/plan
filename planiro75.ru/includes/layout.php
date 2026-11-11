@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 /**
  * @param array $user from require_login()
- * @param string $active 'dashboard'|'tasks'|'department_tasks'|'tags'|'automation'|'plan_year'|'projects'|'departments'|'reports'|'users'|'max_dashboard'
+ * @param string $active 'dashboard'|'tasks'|'department_tasks'|'tags'|'automation'|'plan_year'|'projects'|'departments'|'reports'|'users'|'max_dashboard'|'max_notifications'
  */
 function layout_start(array $user, string $title, string $active = 'dashboard'): void
 {
@@ -73,6 +73,9 @@ function layout_start(array $user, string $title, string $active = 'dashboard'):
     <a class="bx-ibar-item<?= $active === 'users' ? ' is-active' : '' ?>" href="<?= $url('/users.php') ?>" title="Команда">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
     </a>
+    <a class="bx-ibar-item<?= $active === 'max_notifications' ? ' is-active' : '' ?>" href="<?= $url('/max_notifications.php') ?>" title="Уведомления MAX">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    </a>
     <a class="bx-ibar-item<?= $active === 'max_dashboard' ? ' is-active' : '' ?>" href="<?= $url('/max_dashboard.php') ?>" title="MAX мониторинг">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 4-5"/></svg>
     </a>
@@ -96,6 +99,9 @@ function layout_start(array $user, string $title, string $active = 'dashboard'):
         <a class="bx-toplink<?= $active === 'projects' ? ' is-active' : '' ?>" href="<?= $url('/projects.php') ?>">Проекты</a>
 
         <a class="bx-toplink<?= $active === 'reports' ? ' is-active' : '' ?>" href="<?= $url('/reports.php') ?>">Отчёты</a>
+        <?php if ($mayAdminNav): ?>
+        <a class="bx-toplink<?= $active === 'max_notifications' ? ' is-active' : '' ?>" href="<?= $url('/max_notifications.php') ?>">MAX</a>
+        <?php endif; ?>
       </nav>
       <div class="bx-topnav-search">
         <svg class="bx-search-ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>

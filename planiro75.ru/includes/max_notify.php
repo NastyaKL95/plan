@@ -958,7 +958,7 @@ function planner_max_queue_list(int $orgId, string $status = '', string $eventTy
     $stCnt = db()->prepare("SELECT COUNT(*) FROM notification_events ne LEFT JOIN users u ON u.id = ne.user_id WHERE $wSql");
     $stCnt->execute($params);
     $total = (int) ($stCnt->fetchColumn() ?: 0);
-    $sql = "SELECT ne.id, ne.status, ne.event_type, ne.attempts, ne.next_retry_at, ne.sent_at, ne.last_error, ne.created_at,
+    $sql = "SELECT ne.id, ne.status, ne.event_type, ne.task_id, ne.attempts, ne.next_retry_at, ne.sent_at, ne.last_error, ne.created_at,
                    ne.payload_json, u.name AS user_name, u.email AS user_email
             FROM notification_events ne
             LEFT JOIN users u ON u.id = ne.user_id
@@ -968,7 +968,99 @@ function planner_max_queue_list(int $orgId, string $status = '', string $eventTy
     $st = db()->prepare($sql);
     $st->execute($params);
     $items = $st->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($items as &$item) {
+        $text = '';
+        $payload = json_decode((string) ($item['payload_json'] ?? ''), true);
+        if (is_array($payload)) {
+            $text = trim((string) ($payload['text'] ?? ''));
+        }
+        $item['text'] = $text;
+    }
+    unset($item);
+
     return ['total' => $total, 'items' => $items];
+}
+
+/**
+ * @return list<array<string,mixed>>
+ */
+function planner_max_digest_list(int $orgId, int $limit = 200): array
+{
+    if ($orgId <= 0 || !planner_table_exists('max_digest_queue')) {
+        return [];
+    }
+    $limit = max(1, min(500, $limit));
+    $st = db()->prepare(
+        "SELECT d.id, d.event_type, d.task_id, d.text, d.created_at, u.name AS user_name, u.email AS user_email
+         FROM max_digest_queue d
+         LEFT JOIN users u ON u.id = d.user_id
+         WHERE d.organization_id = ?
+         ORDER BY d.id DESC
+         LIMIT $limit"
+    );
+    $st->execute([$orgId]);
+
+    return $st->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Отмена, повтор или повторная отправка одного события очереди MAX.
+ *
+ * @return 'ok'|'not_found'|'bad_action'|'bad_status'
+ */
+function planner_max_queue_apply_action(int $orgId, int $eventId, string $action): string
+{
+    if ($orgId <= 0 || $eventId <= 0 || !planner_max_events_table_ready()) {
+        return 'not_found';
+    }
+    if (!in_array($action, ['cancel', 'retry', 'resend'], true)) {
+        return 'bad_action';
+    }
+    $st = db()->prepare(
+        'SELECT id, status FROM notification_events WHERE id = ? AND organization_id = ? LIMIT 1'
+    );
+    $st->execute([$eventId, $orgId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return 'not_found';
+    }
+    $status = (string) ($row['status'] ?? '');
+    if ($action === 'cancel') {
+        if ($status !== 'pending') {
+            return 'bad_status';
+        }
+        db()->prepare(
+            "UPDATE notification_events
+             SET status = 'cancelled', next_retry_at = NULL, last_error = ?
+             WHERE id = ? AND organization_id = ? AND status = 'pending'"
+        )->execute(['Отменено администратором', $eventId, $orgId]);
+
+        return 'ok';
+    }
+    if ($action === 'retry' && !in_array($status, ['failed', 'cancelled'], true)) {
+        return 'bad_status';
+    }
+    if ($action === 'resend' && $status !== 'sent') {
+        return 'bad_status';
+    }
+    db()->prepare(
+        "UPDATE notification_events
+         SET status = 'pending', attempts = 0, next_retry_at = NOW(), sent_at = NULL, last_error = NULL
+         WHERE id = ? AND organization_id = ?"
+    )->execute([$eventId, $orgId]);
+
+    return 'ok';
+}
+
+function planner_max_digest_cancel(int $orgId, int $digestId): bool
+{
+    if ($orgId <= 0 || $digestId <= 0 || !planner_table_exists('max_digest_queue')) {
+        return false;
+    }
+    $st = db()->prepare('DELETE FROM max_digest_queue WHERE id = ? AND organization_id = ?');
+    $st->execute([$digestId, $orgId]);
+
+    return $st->rowCount() > 0;
 }
 
 /**
@@ -1412,7 +1504,7 @@ function planner_max_enqueue_sla_escalations(): void
                     . "\nДействие: согласуйте новый срок или завершите задачу.\nОткрыть: " . planner_public_task_link($taskId);
                 $doneTok = planner_max_create_action_token($orgId, $uid, $taskId, 'done');
                 if ($doneTok !== []) {
-                    $msg .= "\n✅ Выполнено: " . planner_url('/max_action.php?token=' . urlencode((string) $doneTok['token']));
+                    $msg .= "\n✅ Выполнено: " . planner_public_site_url('/max_action.php?token=' . rawurlencode((string) $doneTok['token']));
                 }
                 planner_max_enqueue_event($orgId, $uid, $taskId, 'sla_overdue_24h', $msg, ['due' => $due], 3600);
             }
@@ -1638,13 +1730,13 @@ function planner_notify_max_task_assigned(int $orgId, int $taskId, int $assignee
     $takeTok = planner_max_create_action_token($orgId, $assigneeId, $taskId, 'take');
     $doneTok = planner_max_create_action_token($orgId, $assigneeId, $taskId, 'done');
     if ($openTok !== []) {
-        $msg .= "\n🔗 Открыть: " . planner_url('/max_action.php?token=' . urlencode((string) $openTok['token']));
+        $msg .= "\n🔗 Открыть: " . planner_public_site_url('/max_action.php?token=' . rawurlencode((string) $openTok['token']));
     }
     if ($takeTok !== []) {
-        $msg .= "\n🟦 Взять в работу: " . planner_url('/max_action.php?token=' . urlencode((string) $takeTok['token']));
+        $msg .= "\n🟦 Взять в работу: " . planner_public_site_url('/max_action.php?token=' . rawurlencode((string) $takeTok['token']));
     }
     if ($doneTok !== []) {
-        $msg .= "\n✅ Отметить выполненной: " . planner_url('/max_action.php?token=' . urlencode((string) $doneTok['token']));
+        $msg .= "\n✅ Отметить выполненной: " . planner_public_site_url('/max_action.php?token=' . rawurlencode((string) $doneTok['token']));
     }
     planner_max_enqueue_event($orgId, $assigneeId, $taskId, 'task_assigned', $msg, [
         'actor_user_id' => $actorUserId,
