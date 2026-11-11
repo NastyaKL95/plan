@@ -5,6 +5,8 @@ require __DIR__ . '/_guard.php';
 require_once dirname(__DIR__, 2) . '/includes/task_extras.php';
 require_once dirname(__DIR__, 2) . '/includes/max_notify.php';
 require_once dirname(__DIR__, 2) . '/includes/my_plan_stages.php';
+require_once dirname(__DIR__, 2) . '/includes/teacher_report.php';
+planner_teacher_report_ensure_schema();
 
 $scope = planner_department_scope_for_projects($user, 'p');
 $hasProjectDept = planner_table_has_column('projects', 'department_id');
@@ -438,6 +440,7 @@ if ($method === 'POST') {
                 'UPDATE tasks SET status_changed_at = COALESCE(created_at, CURRENT_TIMESTAMP) WHERE id = ? AND organization_id = ?'
             )->execute([$id, $orgId]);
         }
+        planner_task_apply_work_report($id, $orgId, $body);
         if (planner_table_has_column('tasks', 'my_plan_lane') && array_key_exists('my_plan_lane', $body)) {
             $lane = (string) ($body['my_plan_lane'] ?? '');
             if (in_array($lane, ['unplanned', 'active', 'week'], true)) {

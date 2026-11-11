@@ -3720,6 +3720,56 @@ a:hover {
   font-size: 1rem;
 }
 
+.teacher-report-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.teacher-report-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.teacher-report-form .teacher-report-actions {
+  display: flex;
+  align-items: end;
+}
+
+.task-work-kinds {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.task-work-kinds label {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.task-work-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.task-work-hours {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.task-work-hint {
+  margin: 2px 0 4px;
+  color: var(--muted, #667);
+  font-size: 0.8rem;
+}
+
 .report-chart-meta {
   margin: 0 0 10px;
   font-size: 0.85rem;

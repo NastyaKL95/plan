@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/includes/bootstrap.php';
 require_once dirname(__DIR__) . '/includes/layout.php';
+require_once dirname(__DIR__) . '/includes/teacher_report.php';
 
 $user = require_login();
 $reportsScopeLevel = planner_reports_visibility_level($user);
@@ -11,6 +12,8 @@ $reportsScopeLead = match ($reportsScopeLevel) {
     'department' => 'Просрочки, «пробуксовка» и быстрые задачи по вашему подразделению.',
     default => 'Просрочки и «пробуксовка» по вашим задачам.',
 };
+$teacherReportReady = planner_teacher_report_ensure_schema();
+$teacherReportUsers = planner_teacher_report_candidates($user);
 layout_start($user, 'Отчёты', 'reports');
 ?>
 <nav class="breadcrumbs" aria-label="Навигация">
@@ -29,6 +32,68 @@ layout_start($user, 'Отчёты', 'reports');
   <a class="btn btn-secondary" href="<?= htmlspecialchars(planner_url('/reports_export.php?mode=tasks'), ENT_QUOTES, 'UTF-8') ?>">Скачать Excel — список задач</a>
   <a class="btn btn-primary" href="<?= htmlspecialchars(planner_url('/reports_efficiency.php'), ENT_QUOTES, 'UTF-8') ?>">Эффективность сотрудников и отделов</a>
 </div>
+
+<section class="report-card report-card--wide" id="teacherReportSection">
+  <h2>Индивидуальный план/отчёт преподавателя</h2>
+  <p class="muted report-lead-stuck">Word-файл в том же виде, что образец: шапка, сводка часов и четыре раздела работ. В карточке задачи отметьте вид работы, сроки, показатель и часы по полугодиям. В отчёт попадают задачи сотрудника за текущий год плана, кроме отменённых.</p>
+  <?php if (!$teacherReportReady): ?>
+  <p class="muted">Поля отчёта в базе пока не созданы. Выполните <code>sql/migration_teacher_report_v1.sql</code>.</p>
+  <?php elseif ($teacherReportUsers === []): ?>
+  <p class="muted">Нет сотрудников, для которых можно собрать отчёт.</p>
+  <?php else: ?>
+  <form class="teacher-report-form" method="post" action="<?= htmlspecialchars(planner_url('/reports_teacher.php'), ENT_QUOTES, 'UTF-8') ?>">
+    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(planner_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
+    <label>Сотрудник
+      <select name="user_id" id="teacherReportUser" required>
+        <?php foreach ($teacherReportUsers as $row): ?>
+          <?php
+            $optLabel = (string) ($row['name'] ?? '');
+            $deptName = trim((string) ($row['department_name'] ?? ''));
+            if ($deptName !== '') {
+                $optLabel .= ' — ' . $deptName;
+            }
+          ?>
+          <option
+            value="<?= (int) $row['id'] ?>"
+            <?= (int) $row['id'] === (int) $user['id'] ? 'selected' : '' ?>
+            data-job="<?= htmlspecialchars((string) ($row['job_title'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+            data-degree="<?= htmlspecialchars((string) ($row['academic_degree'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+            data-rank="<?= htmlspecialchars((string) ($row['academic_rank'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+            data-edu="<?= htmlspecialchars((string) ($row['plan_hours_edu'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+            data-edu-method="<?= htmlspecialchars((string) ($row['plan_hours_edu_method'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+            data-research="<?= htmlspecialchars((string) ($row['plan_hours_research'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+            data-org-method="<?= htmlspecialchars((string) ($row['plan_hours_org_method'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+          ><?= htmlspecialchars($optLabel, ENT_QUOTES, 'UTF-8') ?></option>
+        <?php endforeach; ?>
+      </select>
+    </label>
+    <label>Должность
+      <input type="text" name="job_title" id="teacherReportJob" maxlength="160" autocomplete="off">
+    </label>
+    <label>Ученая степень
+      <input type="text" name="academic_degree" id="teacherReportDegree" maxlength="120" autocomplete="off">
+    </label>
+    <label>Ученое звание
+      <input type="text" name="academic_rank" id="teacherReportRank" maxlength="120" autocomplete="off">
+    </label>
+    <label>План, учебная работа
+      <input type="text" name="plan_hours_edu" id="teacherReportPlanEdu" inputmode="decimal" maxlength="12" autocomplete="off">
+    </label>
+    <label>План, учебно-методическая
+      <input type="text" name="plan_hours_edu_method" id="teacherReportPlanEduMethod" inputmode="decimal" maxlength="12" autocomplete="off">
+    </label>
+    <label>План, научно-исследовательская
+      <input type="text" name="plan_hours_research" id="teacherReportPlanResearch" inputmode="decimal" maxlength="12" autocomplete="off">
+    </label>
+    <label>План, организационно-методическая
+      <input type="text" name="plan_hours_org_method" id="teacherReportPlanOrg" inputmode="decimal" maxlength="12" autocomplete="off">
+    </label>
+    <div class="teacher-report-actions">
+      <button type="submit" class="btn btn-primary">Скачать Word</button>
+    </div>
+  </form>
+  <?php endif; ?>
+</section>
 
 <div class="reports-grid">
   <section class="report-card report-card--wide" id="quickTasksReportSection" hidden>
@@ -173,6 +238,34 @@ layout_start($user, 'Отчёты', 'reports');
     .catch(function () {
       document.getElementById('overdueSummary').textContent = 'Не удалось загрузить данные.';
     });
+})();
+(function () {
+  var sel = document.getElementById('teacherReportUser');
+  if (!sel) return;
+  function prettyPlan(value) {
+    var text = value || '';
+    if (/^\d+\.\d+$/.test(text)) text = text.replace(/0+$/, '').replace(/\.$/, '');
+    return text.replace('.', ',');
+  }
+  function fill() {
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt) return;
+    var map = {
+      teacherReportJob: opt.getAttribute('data-job') || '',
+      teacherReportDegree: opt.getAttribute('data-degree') || '',
+      teacherReportRank: opt.getAttribute('data-rank') || '',
+      teacherReportPlanEdu: prettyPlan(opt.getAttribute('data-edu') || ''),
+      teacherReportPlanEduMethod: prettyPlan(opt.getAttribute('data-edu-method') || ''),
+      teacherReportPlanResearch: prettyPlan(opt.getAttribute('data-research') || ''),
+      teacherReportPlanOrg: prettyPlan(opt.getAttribute('data-org-method') || '')
+    };
+    Object.keys(map).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.value = map[id];
+    });
+  }
+  sel.addEventListener('change', fill);
+  fill();
 })();
 </script>
 <?php layout_end(); ?>

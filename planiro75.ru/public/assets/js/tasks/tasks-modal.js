@@ -89,7 +89,7 @@
     if (md) md.setAttribute('data-task-readonly', mayEdit ? '' : '1');
     var mode = md ? md.getAttribute('data-task-mode') : '';
     if (mode === 'create') {
-      ;['fTitle', 'fDesc', 'fAssignee', 'fDue', 'fStatus', 'fProject', 'fAssistants', 'fObservers'].forEach(function (id) {
+      ;['fTitle', 'fDesc', 'fAssignee', 'fDue', 'fStatus', 'fProject', 'fAssistants', 'fObservers', 'fWorkEdu', 'fWorkEduMethod', 'fWorkResearch', 'fWorkOrgMethod', 'fWorkPeriod', 'fWorkIndicator', 'fWorkHoursH1', 'fWorkHoursH2'].forEach(function (id) {
         var el = $(id);
         if (el) el.disabled = false;
       });
@@ -107,7 +107,7 @@
       if (typeof window.bxCustomSelectSyncAll === 'function') window.bxCustomSelectSyncAll();
       return;
     }
-    ;['fTitle', 'fDesc', 'fAssignee', 'fDue', 'fStatus', 'fAssistants', 'fObservers', 'fRemind', 'fRecurrence', 'fTransitionNote'].forEach(function (id) {
+    ;['fTitle', 'fDesc', 'fAssignee', 'fDue', 'fStatus', 'fAssistants', 'fObservers', 'fRemind', 'fRecurrence', 'fTransitionNote', 'fWorkEdu', 'fWorkEduMethod', 'fWorkResearch', 'fWorkOrgMethod', 'fWorkPeriod', 'fWorkIndicator', 'fWorkHoursH1', 'fWorkHoursH2'].forEach(function (id) {
       var el = $(id);
       if (el) el.disabled = !mayEdit;
     });
@@ -297,6 +297,66 @@
     closeTaskModal();
   }
 
+  function workFlag(id) {
+    var el = $(id);
+    return !!(el && el.checked);
+  }
+
+  function workText(id) {
+    var el = $(id);
+    return el ? (el.value || '').trim() : '';
+  }
+
+  function workHours(id) {
+    var raw = workText(id).replace(',', '.');
+    if (!raw) return null;
+    var n = parseFloat(raw);
+    if (!isFinite(n) || n < 0) return null;
+    return Math.round(n * 100) / 100;
+  }
+
+  function appendWorkReport(body) {
+    body.work_edu = workFlag('fWorkEdu');
+    body.work_edu_method = workFlag('fWorkEduMethod');
+    body.work_research = workFlag('fWorkResearch');
+    body.work_org_method = workFlag('fWorkOrgMethod');
+    body.work_period = workText('fWorkPeriod');
+    body.work_indicator = workText('fWorkIndicator');
+    body.work_hours_first = workHours('fWorkHoursH1');
+    body.work_hours_second = workHours('fWorkHoursH2');
+    return body;
+  }
+
+  function fillWorkReport(t) {
+    t = t || {};
+    function setCb(id, value) {
+      var el = $(id);
+      if (!el) return;
+      el.checked = value === true || value === 1 || value === '1';
+    }
+    function setVal(id, value, asHours) {
+      var el = $(id);
+      if (!el) return;
+      if (value == null || value === '') {
+        el.value = '';
+        return;
+      }
+      var text = String(value);
+      if (asHours && /^\d+\.\d+$/.test(text)) {
+        text = text.replace(/0+$/, '').replace(/\.$/, '');
+      }
+      el.value = asHours ? text.replace('.', ',') : text;
+    }
+    setCb('fWorkEdu', t.work_edu);
+    setCb('fWorkEduMethod', t.work_edu_method);
+    setCb('fWorkResearch', t.work_research);
+    setCb('fWorkOrgMethod', t.work_org_method);
+    setVal('fWorkPeriod', t.work_period || '', false);
+    setVal('fWorkIndicator', t.work_indicator || '', false);
+    setVal('fWorkHoursH1', t.work_hours_first != null && t.work_hours_first !== '' ? t.work_hours_first : '', true);
+    setVal('fWorkHoursH2', t.work_hours_second != null && t.work_hours_second !== '' ? t.work_hours_second : '', true);
+  }
+
   function openCreateTaskModal(opts) {
     rememberTaskModalFocusBack();
     opts = opts || {};
@@ -337,6 +397,7 @@
     $('fDue').value = dueVal;
     if ($('fVisibleDepartment')) $('fVisibleDepartment').checked = false;
     if ($('fVisibleInstitute')) $('fVisibleInstitute').checked = false;
+    fillWorkReport({});
 
     var auth = $('taskModalAuthorDisplay');
     if (auth) auth.textContent = currentUserDisplayName();
@@ -397,6 +458,7 @@
       visible_department: $('fVisibleDepartment') ? !!$('fVisibleDepartment').checked : false,
       visible_institute: $('fVisibleInstitute') ? !!$('fVisibleInstitute').checked : false,
     };
+    appendWorkReport(body);
 
     if (createModalState.myPlanStageId) {
       body.my_plan_stage_id = createModalState.myPlanStageId;
@@ -579,6 +641,7 @@
         $('fDue').value = dueToDatetimeLocal(t.due_date || '');
         if ($('fVisibleDepartment')) $('fVisibleDepartment').checked = !!parseInt(t.visible_department || 0, 10);
         if ($('fVisibleInstitute')) $('fVisibleInstitute').checked = !!parseInt(t.visible_institute || 0, 10);
+        fillWorkReport(t);
         if ($('fRemind')) $('fRemind').value = t.remind_at || '';
         if ($('fRecurrence')) $('fRecurrence').value = t.recurrence || 'none';
         if ($('fTransitionNote')) $('fTransitionNote').value = t.transition_note || '';
@@ -996,6 +1059,7 @@
       visible_department: $('fVisibleDepartment') ? !!$('fVisibleDepartment').checked : false,
       visible_institute: $('fVisibleInstitute') ? !!$('fVisibleInstitute').checked : false,
     };
+    appendWorkReport(body);
     if ($('fRemind')) body.remind_at = $('fRemind').value || null;
     if ($('fRecurrence')) body.recurrence = $('fRecurrence').value || 'none';
     if ($('fTransitionNote')) body.transition_note = $('fTransitionNote').value.trim() || null;

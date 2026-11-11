@@ -5,6 +5,8 @@ require __DIR__ . '/_guard.php';
 require_once dirname(__DIR__, 2) . '/includes/task_extras.php';
 require_once dirname(__DIR__, 2) . '/includes/max_notify.php';
 require_once dirname(__DIR__, 2) . '/includes/my_plan_stages.php';
+require_once dirname(__DIR__, 2) . '/includes/teacher_report.php';
+planner_teacher_report_ensure_schema();
 
 /**
  * Валидные переходы статусов задачи.
@@ -355,6 +357,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
         $fields[] = 'visible_institute = ?';
         $params[] = !empty($body['visible_institute']) ? 1 : 0;
     }
+    planner_task_work_report_append_fields($body, $fields, $params);
 
     $newStatusForClone = array_key_exists('status', $body) ? (string) $body['status'] : $beforeStatus;
     $statusBecameDone = $newStatusForClone === 'done' && $beforeStatus !== 'done';

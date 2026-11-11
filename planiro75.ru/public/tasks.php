@@ -416,6 +416,31 @@ window.__PLANNER_USER_DEPT_ID__=<?= json_encode(isset($user['department_id']) &&
               <label><input type="checkbox" id="fVisibleInstitute"> Видит институт</label>
             </div>
           </li>
+          <li class="task-modal-meta-row task-work-row">
+            <span class="task-modal-meta-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span>
+            <span class="task-modal-meta-key">Вид работы</span>
+            <div class="task-modal-meta-val task-work-kinds">
+              <label><input type="checkbox" id="fWorkEdu"> Учебная работа</label>
+              <label><input type="checkbox" id="fWorkEduMethod"> Учебно-методическая работа</label>
+              <label><input type="checkbox" id="fWorkResearch"> Научно-исследовательская работа</label>
+              <label><input type="checkbox" id="fWorkOrgMethod"> Организационно-методическая работа</label>
+              <p class="task-work-hint">Отмеченные виды попадут в индивидуальный план/отчёт. Можно отметить несколько.</p>
+              <label class="task-work-field">Сроки выполнения
+                <input type="text" id="fWorkPeriod" maxlength="160" placeholder="Март 2026 или Январь–декабрь" autocomplete="off">
+              </label>
+              <label class="task-work-field">Показатель выполнения
+                <input type="text" id="fWorkIndicator" maxlength="255" placeholder="кол-во чел., п. л., стр." autocomplete="off">
+              </label>
+              <div class="task-work-hours">
+                <label class="task-work-field">Часы, 1 полугодие
+                  <input type="text" inputmode="decimal" id="fWorkHoursH1" maxlength="12" placeholder="0" autocomplete="off">
+                </label>
+                <label class="task-work-field">Часы, 2 полугодие
+                  <input type="text" inputmode="decimal" id="fWorkHoursH2" maxlength="12" placeholder="0" autocomplete="off">
+                </label>
+              </div>
+            </div>
+          </li>
         </ul>
 
         <div class="task-modal-pills" role="toolbar" aria-label="Блоки задачи">
