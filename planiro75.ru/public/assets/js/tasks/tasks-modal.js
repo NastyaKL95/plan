@@ -466,7 +466,8 @@
     var mp = $('fProject');
     if (mp) mp.value = String(pid);
 
-    $('fAssignee').value = '';
+    refillAssigneeOptions('');
+    fillParticipantSelects([]);
 
     var st = 'new';
     var dueVal = '';
@@ -723,7 +724,6 @@
         setPriorityUi(t.priority || 'normal');
         ensureTaskProjectOptionFromApi(t);
         $('fProject').value = t.project_id || '';
-        $('fAssignee').value = t.assignee_id || '';
         $('fDue').value = dueToDatetimeLocal(t.due_date || '');
         if ($('fVisibleDepartment')) $('fVisibleDepartment').checked = !!parseInt(t.visible_department || 0, 10);
         if ($('fVisibleInstitute')) $('fVisibleInstitute').checked = !!parseInt(t.visible_institute || 0, 10);
@@ -744,14 +744,13 @@
         renderTagsPicker((t.tags || []).map(function (x) {
           return x.id;
         }));
-        fillParticipantSelects();
         var part = t.participants || {};
-        setMultiSelected(
-          $('fAssistants'),
-          (part.assistants || []).map(function (x) {
-            return x.id;
-          })
-        );
+        var assistantIds = (part.assistants || []).map(function (x) {
+          return x.id;
+        });
+        refillAssigneeOptions(t.assignee_id || '');
+        fillParticipantSelects(assistantIds);
+        setMultiSelected($('fAssistants'), assistantIds);
         setMultiSelected(
           $('fObservers'),
           (part.observers || []).map(function (x) {

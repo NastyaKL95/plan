@@ -342,12 +342,28 @@ if ($method === 'POST') {
     if (!$assigneeId && $tpl && !empty($tpl['assignee_id'])) {
         $assigneeId = (int) $tpl['assignee_id'];
     }
+    $assigneeFromBody = array_key_exists('assignee_id', $body)
+        && $body['assignee_id'] !== null
+        && $body['assignee_id'] !== '';
     if ($assigneeId) {
         $st = db()->prepare('SELECT id FROM users WHERE id = ? AND organization_id = ? LIMIT 1');
         $st->execute([$assigneeId, $orgId]);
         if (!$st->fetch()) {
             $assigneeId = null;
+        } elseif (planner_user_is_blocked_id($orgId, (int) $assigneeId)) {
+            if ($assigneeFromBody) {
+                json_response(['ok' => false, 'error' => 'user_blocked'], 422);
+            }
+            $assigneeId = null;
         }
+    }
+    if (
+        planner_table_exists('task_participants')
+        && array_key_exists('assistant_ids', $body)
+        && is_array($body['assistant_ids'])
+        && planner_blocked_user_ids($orgId, $body['assistant_ids']) !== []
+    ) {
+        json_response(['ok' => false, 'error' => 'user_blocked'], 422);
     }
     $isQuickCreate = !empty($body['is_quick_task']);
     if ($isQuickCreate && !$assigneeId) {
@@ -480,6 +496,7 @@ if ($method === 'POST') {
             if (!empty($tpl['assistant_ids_json'])) {
                 $d = json_decode((string) $tpl['assistant_ids_json'], true);
                 $a = is_array($d) ? array_values(array_filter(array_map('intval', $d))) : [];
+                $a = array_values(array_diff($a, planner_blocked_user_ids($orgId, $a)));
             }
             if (!empty($tpl['observer_ids_json'])) {
                 $d = json_decode((string) $tpl['observer_ids_json'], true);

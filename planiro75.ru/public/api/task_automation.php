@@ -75,6 +75,9 @@ if ($method === 'POST') {
         if (!$chk->fetch()) {
             json_response(['ok' => false, 'error' => 'bad_assignee'], 422);
         }
+        if (planner_user_is_blocked_id($orgId, $aid)) {
+            json_response(['ok' => false, 'error' => 'user_blocked'], 422);
+        }
     }
     $comment = trim((string) ($body['action_comment'] ?? ''));
     $comment = $comment !== ''
@@ -163,6 +166,9 @@ if ($method === 'PATCH' || $method === 'PUT') {
             $uchk->execute([$aid, $orgId]);
             if (!$uchk->fetch()) {
                 json_response(['ok' => false, 'error' => 'bad_assignee'], 422);
+            }
+            if (planner_user_is_blocked_id($orgId, $aid)) {
+                json_response(['ok' => false, 'error' => 'user_blocked'], 422);
             }
             $parts[] = 'action_assignee_id = ?';
             $params[] = $aid;

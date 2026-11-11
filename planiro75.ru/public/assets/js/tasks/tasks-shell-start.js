@@ -346,23 +346,14 @@
           })
           .join('');
       }
-      var fa = $('fAssignee');
-      if (fa) {
-        fa.innerHTML =
-          '<option value="">Не назначен</option>' +
-          users
-            .map(function (u) {
-              return '<option value="' + u.id + '">' + escapeHtml(userPickerLabel(u)) + '</option>';
-            })
-            .join('');
-      }
+      refillAssigneeOptions();
       fillParticipantSelects();
       refreshTemplatePick(taskTemplates);
       var bulkAsg = $('bulkAssignee');
       if (bulkAsg) {
         bulkAsg.innerHTML =
           '<option value="">Не назначен</option>' +
-          users
+          assignableUsers()
             .map(function (u) {
               return '<option value="' + u.id + '">' + escapeHtml(userPickerLabel(u)) + '</option>';
             })
@@ -440,8 +431,9 @@
         }
       }
       var qta = $('quickTaskAssignee');
-      if (qta && users.length) {
-        qta.innerHTML = users
+      var quickUsers = assignableUsers();
+      if (qta && quickUsers.length) {
+        qta.innerHTML = quickUsers
           .map(function (u) {
             return '<option value="' + u.id + '">' + escapeHtml(u.name) + '</option>';
           })

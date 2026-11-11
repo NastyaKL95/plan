@@ -121,6 +121,9 @@
       autoAsg.innerHTML =
         '<option value="">— не менять —</option>' +
         users
+          .filter(function (u) {
+            return !(u && (u.account_status === 'blocked' || u.is_blocked));
+          })
           .map(function (u) {
             return '<option value="' + u.id + '">' + escapeHtml(u.name) + '</option>';
           })

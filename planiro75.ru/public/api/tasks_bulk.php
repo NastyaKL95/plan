@@ -80,6 +80,9 @@ if ($action === 'set_assignee') {
         if (!$chk->fetch()) {
             json_response(['ok' => false, 'error' => 'bad_assignee'], 422);
         }
+        if (planner_user_is_blocked_id($orgId, $aid)) {
+            json_response(['ok' => false, 'error' => 'user_blocked'], 422);
+        }
     }
     $upd = db()->prepare('UPDATE tasks SET assignee_id = ? WHERE id = ? AND organization_id = ?');
     $exists = db()->prepare('SELECT id FROM tasks WHERE id = ? AND organization_id = ? LIMIT 1');

@@ -160,6 +160,41 @@ function planner_user_is_blocked(array $user): bool
     return planner_user_account_status($user) === 'blocked';
 }
 
+function planner_user_is_blocked_id(int $orgId, int $userId): bool
+{
+    if ($orgId <= 0 || $userId <= 0 || !planner_table_has_column('users', 'account_status')) {
+        return false;
+    }
+    $st = db()->prepare(
+        'SELECT account_status FROM users WHERE id = ? AND organization_id = ? LIMIT 1'
+    );
+    $st->execute([$userId, $orgId]);
+
+    return (string) $st->fetchColumn() === 'blocked';
+}
+
+/**
+ * @param list<int> $ids
+ * @return list<int>
+ */
+function planner_blocked_user_ids(int $orgId, array $ids): array
+{
+    if ($orgId <= 0 || $ids === [] || !planner_table_has_column('users', 'account_status')) {
+        return [];
+    }
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn (int $id): bool => $id > 0)));
+    if ($ids === []) {
+        return [];
+    }
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    $st = db()->prepare(
+        "SELECT id FROM users WHERE organization_id = ? AND account_status = 'blocked' AND id IN ($ph)"
+    );
+    $st->execute(array_merge([$orgId], $ids));
+
+    return array_map('intval', array_column($st->fetchAll(PDO::FETCH_ASSOC), 'id'));
+}
+
 /**
  * Счётчики задач по всем пользователям организации (один запрос вместо N).
  *

@@ -302,6 +302,9 @@ if ($method === 'PATCH' || $method === 'PUT') {
             if (!$chk->fetch()) {
                 json_response(['ok' => false, 'error' => 'bad_assignee'], 422);
             }
+            if ($aid !== $beforeAssigneeId && planner_user_is_blocked_id($orgId, $aid)) {
+                json_response(['ok' => false, 'error' => 'user_blocked'], 422);
+            }
         }
         $fields[] = 'assignee_id = ?';
         $params[] = $aid;
@@ -365,6 +368,25 @@ if ($method === 'PATCH' || $method === 'PUT') {
     $participantBody =
         planner_table_exists('task_participants')
         && (array_key_exists('assistant_ids', $body) || array_key_exists('observer_ids', $body));
+    if ($participantBody && array_key_exists('assistant_ids', $body) && is_array($body['assistant_ids'])) {
+        $requestedAssistants = array_map('intval', $body['assistant_ids']);
+        $existingAssistants = [];
+        $stExistingAssistants = db()->prepare(
+            "SELECT user_id FROM task_participants WHERE task_id = ? AND role = 'assistant'"
+        );
+        $stExistingAssistants->execute([$id]);
+        $existingAssistants = array_map(
+            static fn (array $r): int => (int) $r['user_id'],
+            $stExistingAssistants->fetchAll(PDO::FETCH_ASSOC)
+        );
+        $newBlockedAssistants = array_diff(
+            planner_blocked_user_ids($orgId, $requestedAssistants),
+            $existingAssistants
+        );
+        if ($newBlockedAssistants !== []) {
+            json_response(['ok' => false, 'error' => 'user_blocked'], 422);
+        }
+    }
     if ($fields === [] && !array_key_exists('tag_ids', $body) && !$participantBody) {
         json_response(['ok' => false, 'error' => 'no_fields'], 422);
     }

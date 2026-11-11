@@ -291,22 +291,49 @@
 
   function userPickerLabel(u) {
     var name = u.name || '';
-    if (u.account_status === 'blocked' || u.is_blocked) {
+    if (userIsBlocked(u)) {
       return name + ' (заблокирован)';
     }
     return name;
   }
 
-  function fillParticipantSelects() {
-    var opts = users
-      .map(function (u) {
-        return '<option value="' + u.id + '">' + escapeHtml(userPickerLabel(u)) + '</option>';
-      })
-      .join('');
+  function userIsBlocked(u) {
+    return !!(u && (u.account_status === 'blocked' || u.is_blocked));
+  }
+
+  function assignableUsers(keepIds) {
+    var keep = {};
+    (keepIds || []).forEach(function (id) {
+      if (id !== null && id !== undefined && String(id) !== '') keep[String(id)] = true;
+    });
+    return users.filter(function (u) {
+      return !userIsBlocked(u) || !!keep[String(u.id)];
+    });
+  }
+
+  function userOptionHtml(u) {
+    return '<option value="' + u.id + '">' + escapeHtml(userPickerLabel(u)) + '</option>';
+  }
+
+  function refillAssigneeOptions(keepId) {
+    var fa = $('fAssignee');
+    if (!fa) return;
+    var current = keepId != null && keepId !== undefined ? keepId : fa.value;
+    fa.innerHTML =
+      '<option value="">Не назначен</option>' +
+      assignableUsers(current ? [current] : [])
+        .map(userOptionHtml)
+        .join('');
+    if (current) fa.value = String(current);
+  }
+
+  function fillParticipantSelects(keepAssistantIds) {
+    var assistantOpts = assignableUsers(keepAssistantIds).map(userOptionHtml).join('');
+    var observerOpts = users.map(userOptionHtml).join('');
     var fa = $('fAssistants');
     var fo = $('fObservers');
-    if (fa) fa.innerHTML = opts;
-    if (fo) fo.innerHTML = opts;
+    if (fa) fa.innerHTML = assistantOpts;
+    if (fo) fo.innerHTML = observerOpts;
     updateParticipantSummaries();
     if (typeof window.bxCustomSelectSyncAll === 'function') window.bxCustomSelectSyncAll();
   }
@@ -461,6 +488,18 @@
       }
     }
     var sourceList = role === 'project' ? projects : users;
+    if (role === 'assignee' || role === 'assistants') {
+      var keepIds = [];
+      if (role === 'assignee') {
+        var currentAssignee = $('fAssignee') && $('fAssignee').value;
+        if (currentAssignee) keepIds.push(currentAssignee);
+      } else {
+        selectedParticipantItems('assistants').forEach(function (item) {
+          keepIds.push(item.id);
+        });
+      }
+      sourceList = assignableUsers(keepIds);
+    }
     if (role === 'assignee') {
       sourceList = [{ id: '', name: 'Не назначен' }].concat(sourceList);
     }
@@ -477,7 +516,7 @@
       .map(function (u) {
         var valueRaw = u && Object.prototype.hasOwnProperty.call(u, 'id') ? String(u.id) : '';
         var checked = !!selectedSet[valueRaw];
-        var displayName = role === 'project' ? projectOptionLabel(u) : String(u.name || '');
+        var displayName = role === 'project' ? projectOptionLabel(u) : userPickerLabel(u);
         var name = escapeHtml(displayName);
         var avatar = escapeHtml((displayName || '?').trim().slice(0, 1).toUpperCase());
         return (
