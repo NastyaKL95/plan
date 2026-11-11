@@ -39,7 +39,10 @@ $card = [
     'plan_hours_research' => $_POST['plan_hours_research'] ?? '',
     'plan_hours_org_method' => $_POST['plan_hours_org_method'] ?? '',
 ];
-planner_teacher_report_save_card($subjectId, $orgId, $card);
+$actorId = (int) ($user['id'] ?? 0);
+if ($subjectId === $actorId || user_is_organization_admin($user)) {
+    planner_teacher_report_save_card($subjectId, $orgId, $card);
+}
 
 $subject = planner_teacher_report_subject($orgId, $subjectId);
 if ($subject === null) {

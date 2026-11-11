@@ -291,54 +291,26 @@ function project_visible_to_user(array $user, int $projectId): bool
 
 function task_visible_to_user(array $user, int $taskId): bool
 {
-    if (in_array($user['role'] ?? '', ['admin', 'owner'], true)) {
-        return true;
-    }
-    $uid = (int) $user['id'];
-    $orgId = (int) $user['organization_id'];
-    $st = db()->prepare(
-        'SELECT 1 FROM tasks WHERE id = ? AND organization_id = ? AND (author_id = ? OR assignee_id = ?) LIMIT 1'
-    );
-    $st->execute([$taskId, $orgId, $uid, $uid]);
-    if ($st->fetchColumn()) {
-        return true;
-    }
-    if (planner_table_exists('task_participants')) {
-        $st = db()->prepare(
-            'SELECT 1 FROM tasks t
-             INNER JOIN task_participants tp ON tp.task_id = t.id AND tp.user_id = ?
-             WHERE t.id = ? AND t.organization_id = ? LIMIT 1'
-        );
-        $st->execute([$uid, $taskId, $orgId]);
-        if ($st->fetchColumn()) {
-            return true;
-        }
-    }
-    if (planner_table_has_column('tasks', 'visible_institute')) {
-        $st = db()->prepare(
-            'SELECT 1 FROM tasks WHERE id = ? AND organization_id = ? AND visible_institute = 1 LIMIT 1'
-        );
-        $st->execute([$taskId, $orgId]);
-        if ($st->fetchColumn()) {
-            return true;
-        }
-    }
-    if (!planner_table_has_column('projects', 'department_id') || !planner_table_has_column('tasks', 'visible_department')) {
+    if ($taskId <= 0) {
         return false;
     }
-    $scope = user_department_membership_ids($user);
-    if ($scope === []) {
+    $orgId = (int) ($user['organization_id'] ?? 0);
+    if ($orgId <= 0) {
         return false;
     }
-    $ph = implode(',', array_fill(0, count($scope), '?'));
-    $params = [$orgId, $taskId];
-    $params = array_merge($params, $scope);
-    $sql = "SELECT t.id FROM tasks t
-            INNER JOIN projects p ON p.id = t.project_id
-            WHERE t.organization_id = ? AND t.id = ? AND t.visible_department = 1 AND p.department_id IN ($ph)
-            LIMIT 1";
+    if (!function_exists('planner_tasks_visibility_fragment')) {
+        require_once __DIR__ . '/task_extras.php';
+    }
+    $hasProjectDept = planner_table_has_column('projects', 'department_id');
+    $vis = planner_tasks_visibility_fragment($user, ['sql' => '', 'params' => []], $hasProjectDept);
+    $join = $hasProjectDept
+        ? ' LEFT JOIN projects p ON p.id = t.project_id AND p.organization_id = t.organization_id '
+        : '';
+    $sql = 'SELECT 1 FROM tasks t' . $join
+        . ' WHERE t.organization_id = ? AND t.id = ?' . $vis['sql'] . ' LIMIT 1';
     $st = db()->prepare($sql);
-    $st->execute($params);
+    $st->execute(array_merge([$orgId, $taskId], $vis['params']));
+
     return (bool) $st->fetchColumn();
 }
 

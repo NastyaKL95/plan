@@ -162,7 +162,9 @@ function planner_max_flush_due_digests(int $limitUsers = 200): int
             $lines[] = '• [' . $ev . '] ' . ($tid > 0 ? ('#' . $tid . ' ') : '') . $short;
         }
         $msg = "🧾 Дайджест Planner (" . count($rows) . ")\n" . implode("\n", $lines);
-        planner_max_enqueue_event($orgId, $userId, 0, 'digest_summary', $msg, ['count' => count($rows)], 60);
+        if (!planner_max_enqueue_event($orgId, $userId, 0, 'digest_summary', $msg, ['count' => count($rows)], 60)) {
+            continue;
+        }
         db()->prepare("DELETE FROM max_digest_queue WHERE organization_id = ? AND user_id = ?")->execute([$orgId, $userId]);
         $sent++;
     }
@@ -1249,20 +1251,20 @@ function planner_max_enqueue_event(
     string $text,
     array $payload = [],
     int $bucketSec = 120
-): void {
+): bool {
     if (!planner_max_enabled()) {
-        return;
+        return false;
     }
     if (!planner_max_user_pref_allows_event($orgId, $userId, $eventType)) {
-        return;
+        return false;
     }
     $chatId = planner_max_user_chat_id($orgId, $userId);
     if ($chatId === '') {
-        return;
+        return false;
     }
     $text = trim($text);
     if ($text === '') {
-        return;
+        return false;
     }
     $payload['text'] = $text;
     $payload['chat_id'] = $chatId;
@@ -1270,7 +1272,7 @@ function planner_max_enqueue_event(
     $payload['task_id'] = $taskId > 0 ? $taskId : null;
     if (!planner_max_events_table_ready()) {
         planner_max_legacy_runtime_queue($chatId, $text);
-        return;
+        return true;
     }
     $prefsForDigest = planner_max_user_prefs($orgId, $userId);
     if (
@@ -1284,7 +1286,7 @@ function planner_max_enqueue_event(
             'INSERT INTO max_digest_queue (organization_id, user_id, event_type, task_id, text, created_at)
              VALUES (?, ?, ?, ?, ?, NOW())'
         )->execute([$orgId, $userId, $eventType, $taskId > 0 ? $taskId : null, $text]);
-        return;
+        return true;
     }
     $dedupeKey = planner_max_dedupe_key($eventType, $orgId, $userId, max(0, $taskId), $bucketSec);
     $payload['message_id'] = hash('sha256', $dedupeKey);
@@ -1305,22 +1307,23 @@ function planner_max_enqueue_event(
         $json,
     ]);
     static $kickRegistered = false;
-    if ($kickRegistered) {
-        return;
-    }
-    $kickRegistered = true;
-    register_shutdown_function(static function (): void {
-        try {
-            if (function_exists('planner_http_release_client')) {
-                planner_http_release_client();
+    if (!$kickRegistered) {
+        $kickRegistered = true;
+        register_shutdown_function(static function (): void {
+            try {
+                if (function_exists('planner_http_release_client')) {
+                    planner_http_release_client();
+                }
+                @ignore_user_abort(true);
+                @set_time_limit(15);
+                planner_max_process_queue(50, 3);
+            } catch (Throwable $e) {
+                planner_max_log_failure(0, 'queue_kick: ' . $e->getMessage());
             }
-            @ignore_user_abort(true);
-            @set_time_limit(15);
-            planner_max_process_queue(50, 3);
-        } catch (Throwable $e) {
-            planner_max_log_failure(0, 'queue_kick: ' . $e->getMessage());
-        }
-    });
+        });
+    }
+
+    return true;
 }
 
 /**

@@ -780,15 +780,28 @@ function planner_teacher_report_docx(array $subject, array $tasks, int $year): s
     $volume = planner_teacher_report_sum_text($planNumbers);
     $planTotal = $volume;
     $factTotalValues = [];
-    foreach (planner_teacher_report_kinds() as $column => $meta) {
-        foreach ($tasks as $task) {
-            if (empty($task[$column])) {
-                continue;
+    $factCounted = [];
+    foreach ($tasks as $task) {
+        $taskId = (int) ($task['id'] ?? 0);
+        if ($taskId > 0 && isset($factCounted[$taskId])) {
+            continue;
+        }
+        $inReport = false;
+        foreach (array_keys(planner_teacher_report_kinds()) as $column) {
+            if (!empty($task[$column])) {
+                $inReport = true;
+                break;
             }
-            $hours = planner_teacher_report_half_hours($task);
-            if ($hours['year'] !== null) {
-                $factTotalValues[] = $hours['year'];
-            }
+        }
+        if (!$inReport) {
+            continue;
+        }
+        if ($taskId > 0) {
+            $factCounted[$taskId] = true;
+        }
+        $hours = planner_teacher_report_half_hours($task);
+        if ($hours['year'] !== null) {
+            $factTotalValues[] = $hours['year'];
         }
     }
     $factTotal = planner_teacher_report_sum_text($factTotalValues);

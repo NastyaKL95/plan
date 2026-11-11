@@ -47,7 +47,7 @@ layout_start($user, 'Отчёты', 'reports');
     <div class="teacher-report-form">
     <div>
     <label class="field-label" for="teacherReportUser">Сотрудник</label>
-      <select class="input-block" name="user_id" id="teacherReportUser" required>
+      <select class="input-block" name="user_id" id="teacherReportUser" required data-actor-id="<?= (int) $user['id'] ?>" data-save-others="<?= user_is_organization_admin($user) ? '1' : '0' ?>">
         <?php foreach ($teacherReportUsers as $row): ?>
           <?php
             $optLabel = (string) ($row['name'] ?? '');
@@ -99,6 +99,7 @@ layout_start($user, 'Отчёты', 'reports');
       <input class="input-block" type="text" name="plan_hours_org_method" id="teacherReportPlanOrg" inputmode="decimal" maxlength="12" autocomplete="off">
     </div>
     </div>
+    <p class="muted" id="teacherReportSaveNote" hidden>Для другого сотрудника эти поля попадут только в файл. Должность и плановые часы в его карточке не изменятся.</p>
     <div class="teacher-report-actions">
       <button type="submit" class="btn btn-primary">Скачать Word</button>
     </div>
@@ -273,6 +274,11 @@ layout_start($user, 'Отчёты', 'reports');
       var el = document.getElementById(id);
       if (el) el.value = map[id];
     });
+    var note = document.getElementById('teacherReportSaveNote');
+    if (note) {
+      var foreign = String(sel.value) !== String(sel.getAttribute('data-actor-id') || '');
+      note.hidden = !foreign || sel.getAttribute('data-save-others') === '1';
+    }
   }
   sel.addEventListener('change', fill);
   fill();
