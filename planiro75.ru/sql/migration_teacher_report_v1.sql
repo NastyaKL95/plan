@@ -33,6 +33,20 @@ SET @sql := IF(
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql := IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'tasks' AND COLUMN_NAME = 'work_start') = 0,
+  'ALTER TABLE tasks ADD COLUMN work_start DATE NULL COMMENT ''Дата начала выполнения для отчёта''',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'tasks' AND COLUMN_NAME = 'work_hours') = 0,
+  'ALTER TABLE tasks ADD COLUMN work_hours DECIMAL(8,2) NULL COMMENT ''Объём часов; полугодия считаются по сроку''',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := IF(
   (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'tasks' AND COLUMN_NAME = 'work_period') = 0,
   'ALTER TABLE tasks ADD COLUMN work_period VARCHAR(160) NULL COMMENT ''Сроки выполнения для отчёта''',
   'SELECT 1'

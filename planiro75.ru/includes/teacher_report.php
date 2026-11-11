@@ -27,8 +27,10 @@ function planner_teacher_report_ensure_schema(): bool
             'work_edu_method' => 'TINYINT(1) NOT NULL DEFAULT 0',
             'work_research' => 'TINYINT(1) NOT NULL DEFAULT 0',
             'work_org_method' => 'TINYINT(1) NOT NULL DEFAULT 0',
+            'work_start' => 'DATE NULL',
             'work_period' => 'VARCHAR(160) NULL',
             'work_indicator' => 'VARCHAR(255) NULL',
+            'work_hours' => 'DECIMAL(8,2) NULL',
             'work_hours_first' => 'DECIMAL(8,2) NULL',
             'work_hours_second' => 'DECIMAL(8,2) NULL',
         ],
@@ -89,6 +91,8 @@ function planner_teacher_report_ensure_schema(): bool
     $ready = planner_table_has_column('tasks', 'work_edu')
         && planner_table_has_column('tasks', 'work_hours_first')
         && planner_table_has_column('tasks', 'work_hours_second')
+        && planner_table_has_column('tasks', 'work_hours')
+        && planner_table_has_column('tasks', 'work_start')
         && planner_table_has_column('users', 'job_title');
 
     return $ready;
@@ -143,13 +147,17 @@ function planner_task_work_report_append_fields(array $body, array &$fields, arr
         $fields[] = $column . ' = ?';
         $params[] = !empty($body[$column]) ? 1 : 0;
     }
-    if (planner_table_has_column('tasks', 'work_period') && array_key_exists('work_period', $body)) {
-        $fields[] = 'work_period = ?';
-        $params[] = planner_teacher_report_clip($body['work_period'], 160);
+    if (planner_table_has_column('tasks', 'work_start') && array_key_exists('work_start', $body)) {
+        $fields[] = 'work_start = ?';
+        $params[] = planner_teacher_report_date_value($body['work_start']);
     }
     if (planner_table_has_column('tasks', 'work_indicator') && array_key_exists('work_indicator', $body)) {
         $fields[] = 'work_indicator = ?';
         $params[] = planner_teacher_report_clip($body['work_indicator'], 255);
+    }
+    if (planner_table_has_column('tasks', 'work_hours') && array_key_exists('work_hours', $body)) {
+        $fields[] = 'work_hours = ?';
+        $params[] = planner_teacher_report_hours_value($body['work_hours']);
     }
     foreach (['work_hours_first', 'work_hours_second'] as $column) {
         if (!planner_table_has_column('tasks', $column) || !array_key_exists($column, $body)) {
@@ -168,6 +176,165 @@ function planner_task_apply_work_report(int $taskId, int $orgId, array $body): v
     $fields = [];
     $params = [];
     planner_task_work_report_append_fields($body, $fields, $params);
+    if ($fields !== []) {
+        $params[] = $taskId;
+        $params[] = $orgId;
+        db()->prepare(
+            'UPDATE tasks SET ' . implode(', ', $fields) . ' WHERE id = ? AND organization_id = ?'
+        )->execute($params);
+    }
+    planner_task_work_report_sync($taskId, $orgId, array_key_exists('work_hours', $body));
+}
+
+function planner_teacher_report_date_value($raw): ?string
+{
+    $date = planner_teacher_report_parse_date($raw);
+
+    return $date ? $date->format('Y-m-d') : null;
+}
+
+function planner_teacher_report_parse_date($raw): ?DateTimeImmutable
+{
+    $text = trim((string) $raw);
+    if ($text === '') {
+        return null;
+    }
+    $text = substr(str_replace('T', ' ', $text), 0, 10);
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $text);
+    $errors = DateTimeImmutable::getLastErrors();
+    if (
+        !$date
+        || (is_array($errors) && ((($errors['warning_count'] ?? 0) > 0) || (($errors['error_count'] ?? 0) > 0)))
+    ) {
+        return null;
+    }
+
+    return $date;
+}
+
+/**
+ * @return list<array{0:int,1:int}>
+ */
+function planner_teacher_report_month_span(?string $startRaw, ?string $endRaw): array
+{
+    $end = planner_teacher_report_parse_date($endRaw);
+    if ($end === null) {
+        return [];
+    }
+    $start = planner_teacher_report_parse_date($startRaw) ?? $end;
+    if ($start > $end) {
+        [$start, $end] = [$end, $start];
+    }
+    $cursor = $start->modify('first day of this month');
+    $last = $end->modify('first day of this month');
+    $span = [];
+    while ($cursor <= $last && count($span) < 36) {
+        $span[] = [(int) $cursor->format('Y'), (int) $cursor->format('n')];
+        $cursor = $cursor->modify('+1 month');
+    }
+
+    return $span;
+}
+
+function planner_teacher_report_month_names(): array
+{
+    return [
+        1 => 'Январь', 2 => 'Февраль', 3 => 'Март', 4 => 'Апрель',
+        5 => 'Май', 6 => 'Июнь', 7 => 'Июль', 8 => 'Август',
+        9 => 'Сентябрь', 10 => 'Октябрь', 11 => 'Ноябрь', 12 => 'Декабрь',
+    ];
+}
+
+function planner_teacher_report_period_from_dates(?string $startRaw, ?string $endRaw): string
+{
+    $span = planner_teacher_report_month_span($startRaw, $endRaw);
+    if ($span === []) {
+        return '';
+    }
+    $names = planner_teacher_report_month_names();
+    $first = $span[0];
+    $last = $span[count($span) - 1];
+    $from = ($names[$first[1]] ?? '') . ' ' . $first[0];
+    if ($first === $last) {
+        return $from;
+    }
+    if ($first[0] === $last[0]) {
+        return ($names[$first[1]] ?? '') . '–' . ($names[$last[1]] ?? '') . ' ' . $first[0];
+    }
+
+    return $from . ' – ' . ($names[$last[1]] ?? '') . ' ' . $last[0];
+}
+
+/**
+ * @return array{h1:?float,h2:?float,year:?float}
+ */
+function planner_teacher_report_split_hours(float $total, ?string $startRaw, ?string $endRaw): array
+{
+    $span = planner_teacher_report_month_span($startRaw, $endRaw);
+    if ($span === []) {
+        return ['h1' => null, 'h2' => null, 'year' => $total];
+    }
+    $h1n = 0;
+    $h2n = 0;
+    foreach ($span as $point) {
+        if ($point[1] <= 6) {
+            $h1n++;
+        } else {
+            $h2n++;
+        }
+    }
+    $count = $h1n + $h2n;
+    if ($h2n === 0) {
+        return ['h1' => $total, 'h2' => 0.0, 'year' => $total];
+    }
+    if ($h1n === 0) {
+        return ['h1' => 0.0, 'h2' => $total, 'year' => $total];
+    }
+    $h1 = round($total * $h1n / $count, 2);
+
+    return ['h1' => $h1, 'h2' => round($total - $h1, 2), 'year' => $total];
+}
+
+function planner_task_work_report_sync(int $taskId, int $orgId, bool $hoursTouched): void
+{
+    if ($taskId <= 0 || !planner_table_has_column('tasks', 'work_hours') || !planner_table_has_column('tasks', 'work_start')) {
+        return;
+    }
+    $st = db()->prepare(
+        'SELECT due_date, work_start, work_hours FROM tasks WHERE id = ? AND organization_id = ? LIMIT 1'
+    );
+    $st->execute([$taskId, $orgId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return;
+    }
+    $period = planner_teacher_report_period_from_dates(
+        isset($row['work_start']) ? (string) $row['work_start'] : null,
+        isset($row['due_date']) ? (string) $row['due_date'] : null
+    );
+    $fields = [];
+    $params = [];
+    if ($period !== '' && planner_table_has_column('tasks', 'work_period')) {
+        $fields[] = 'work_period = ?';
+        $params[] = $period;
+    }
+    $total = planner_teacher_report_hours_value($row['work_hours'] ?? null);
+    if ($total !== null) {
+        $split = planner_teacher_report_split_hours(
+            (float) $total,
+            isset($row['work_start']) ? (string) $row['work_start'] : null,
+            isset($row['due_date']) ? (string) $row['due_date'] : null
+        );
+        $fields[] = 'work_hours_first = ?';
+        $params[] = $split['h1'] === null ? null : number_format($split['h1'], 2, '.', '');
+        $fields[] = 'work_hours_second = ?';
+        $params[] = $split['h2'] === null ? null : number_format($split['h2'], 2, '.', '');
+    } elseif ($hoursTouched) {
+        $fields[] = 'work_hours_first = ?';
+        $params[] = null;
+        $fields[] = 'work_hours_second = ?';
+        $params[] = null;
+    }
     if ($fields === []) {
         return;
     }
@@ -288,10 +455,18 @@ function planner_teacher_report_tasks(int $orgId, int $userId, int $year): array
         return [];
     }
     $yearSql = planner_table_has_column('tasks', 'work_year') ? ' AND t.work_year = ?' : '';
+    $extra = '';
+    if (planner_table_has_column('tasks', 'work_start')) {
+        $extra .= ', t.work_start';
+    }
+    if (planner_table_has_column('tasks', 'work_hours')) {
+        $extra .= ', t.work_hours';
+    }
     $st = db()->prepare(
         'SELECT t.id, t.title, t.description, t.due_date, t.status,
                 t.work_edu, t.work_edu_method, t.work_research, t.work_org_method,
-                t.work_period, t.work_indicator, t.work_hours_first, t.work_hours_second
+                t.work_period, t.work_indicator, t.work_hours_first, t.work_hours_second'
+        . $extra . '
          FROM tasks t
          WHERE t.organization_id = ?
            AND t.status <> \'cancelled\'
@@ -377,25 +552,15 @@ function planner_teacher_report_sum_text(array $values): string
 
 function planner_teacher_report_period(array $task): string
 {
-    $period = trim((string) ($task['work_period'] ?? ''));
-    if ($period !== '') {
-        return $period;
+    $fromDates = planner_teacher_report_period_from_dates(
+        isset($task['work_start']) ? (string) $task['work_start'] : null,
+        isset($task['due_date']) ? (string) $task['due_date'] : null
+    );
+    if ($fromDates !== '') {
+        return $fromDates;
     }
-    $due = trim((string) ($task['due_date'] ?? ''));
-    if ($due === '') {
-        return '';
-    }
-    $ts = strtotime($due);
-    if ($ts === false) {
-        return '';
-    }
-    $months = [
-        1 => 'Январь', 2 => 'Февраль', 3 => 'Март', 4 => 'Апрель',
-        5 => 'Май', 6 => 'Июнь', 7 => 'Июль', 8 => 'Август',
-        9 => 'Сентябрь', 10 => 'Октябрь', 11 => 'Ноябрь', 12 => 'Декабрь',
-    ];
 
-    return ($months[(int) date('n', $ts)] ?? '') . ' ' . date('Y', $ts);
+    return trim((string) ($task['work_period'] ?? ''));
 }
 
 function planner_teacher_report_task_title(array $task): string
@@ -480,6 +645,14 @@ function planner_docx_tbl(array $widths, string $rows): string
 
 function planner_teacher_report_half_hours(array $task): array
 {
+    $total = planner_teacher_report_hours_value($task['work_hours'] ?? null);
+    if ($total !== null) {
+        return planner_teacher_report_split_hours(
+            (float) $total,
+            isset($task['work_start']) ? (string) $task['work_start'] : null,
+            isset($task['due_date']) ? (string) $task['due_date'] : null
+        );
+    }
     $h1 = $task['work_hours_first'] ?? null;
     $h2 = $task['work_hours_second'] ?? null;
     $h1set = $h1 !== null && $h1 !== '' && is_numeric($h1);

@@ -378,6 +378,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
             $params[] = $orgId;
             $sql = 'UPDATE tasks SET ' . implode(', ', $fields) . ' WHERE id = ? AND organization_id = ?';
             db()->prepare($sql)->execute($params);
+            planner_task_work_report_sync($id, $orgId, array_key_exists('work_hours', $body));
             log_activity($orgId, $userId, 'update', 'task', $id, 'Обновлена задача');
         }
         if (array_key_exists('tag_ids', $body) && planner_table_exists('task_tag_map')) {

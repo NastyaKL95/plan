@@ -89,7 +89,7 @@
     if (md) md.setAttribute('data-task-readonly', mayEdit ? '' : '1');
     var mode = md ? md.getAttribute('data-task-mode') : '';
     if (mode === 'create') {
-      ;['fTitle', 'fDesc', 'fAssignee', 'fDue', 'fStatus', 'fProject', 'fAssistants', 'fObservers', 'fWorkEdu', 'fWorkEduMethod', 'fWorkResearch', 'fWorkOrgMethod', 'fWorkPeriod', 'fWorkIndicator', 'fWorkHoursH1', 'fWorkHoursH2'].forEach(function (id) {
+      ;['fTitle', 'fDesc', 'fAssignee', 'fDue', 'fStatus', 'fProject', 'fAssistants', 'fObservers', 'fWorkEdu', 'fWorkEduMethod', 'fWorkResearch', 'fWorkOrgMethod', 'fWorkStart', 'fWorkIndicator', 'fWorkHours'].forEach(function (id) {
         var el = $(id);
         if (el) el.disabled = false;
       });
@@ -107,7 +107,7 @@
       if (typeof window.bxCustomSelectSyncAll === 'function') window.bxCustomSelectSyncAll();
       return;
     }
-    ;['fTitle', 'fDesc', 'fAssignee', 'fDue', 'fStatus', 'fAssistants', 'fObservers', 'fRemind', 'fRecurrence', 'fTransitionNote', 'fWorkEdu', 'fWorkEduMethod', 'fWorkResearch', 'fWorkOrgMethod', 'fWorkPeriod', 'fWorkIndicator', 'fWorkHoursH1', 'fWorkHoursH2'].forEach(function (id) {
+    ;['fTitle', 'fDesc', 'fAssignee', 'fDue', 'fStatus', 'fAssistants', 'fObservers', 'fRemind', 'fRecurrence', 'fTransitionNote', 'fWorkEdu', 'fWorkEduMethod', 'fWorkResearch', 'fWorkOrgMethod', 'fWorkStart', 'fWorkIndicator', 'fWorkHours'].forEach(function (id) {
       var el = $(id);
       if (el) el.disabled = !mayEdit;
     });
@@ -315,15 +315,93 @@
     return Math.round(n * 100) / 100;
   }
 
+  var WORK_MONTHS = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+
+  function workDateParts(value) {
+    var m = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    return { y: parseInt(m[1], 10), m: parseInt(m[2], 10) };
+  }
+
+  function workMonthSpan(start, end) {
+    if (!end) return [];
+    if (!start) start = end;
+    var sy = start.y;
+    var sm = start.m;
+    var ey = end.y;
+    var em = end.m;
+    if (sy > ey || (sy === ey && sm > em)) {
+      var ty = sy;
+      var tm = sm;
+      sy = ey;
+      sm = em;
+      ey = ty;
+      em = tm;
+    }
+    var out = [];
+    var y = sy;
+    var month = sm;
+    while ((y < ey || (y === ey && month <= em)) && out.length < 36) {
+      out.push({ y: y, m: month });
+      month += 1;
+      if (month > 12) {
+        month = 1;
+        y += 1;
+      }
+    }
+    return out;
+  }
+
+  function workHoursText(n) {
+    if (n == null || !isFinite(n)) return '';
+    var rounded = Math.round(n * 100) / 100;
+    var text = String(rounded);
+    if (text.indexOf('.') >= 0) text = text.replace(/0+$/, '').replace(/\.$/, '');
+    return text.replace('.', ',');
+  }
+
+  function refreshWorkSpanPreview() {
+    var el = $('fWorkPeriodPreview');
+    if (!el) return;
+    var start = workDateParts($('fWorkStart') && $('fWorkStart').value);
+    var end = workDateParts($('fDue') && $('fDue').value);
+    var span = workMonthSpan(start, end);
+    if (!span.length) {
+      el.textContent = 'Срок выполнения — месяцы от даты начала до крайнего срока. Часы полугодий считаются по этим месяцам.';
+      return;
+    }
+    var first = span[0];
+    var last = span[span.length - 1];
+    var period = WORK_MONTHS[first.m] + ' ' + first.y;
+    if (first.y !== last.y || first.m !== last.m) {
+      period = first.y === last.y
+        ? WORK_MONTHS[first.m] + '–' + WORK_MONTHS[last.m] + ' ' + first.y
+        : WORK_MONTHS[first.m] + ' ' + first.y + ' – ' + WORK_MONTHS[last.m] + ' ' + last.y;
+    }
+    var text = 'Срок: ' + period + '.';
+    var hours = workHours('fWorkHours');
+    if (hours != null) {
+      var h1n = 0;
+      var h2n = 0;
+      span.forEach(function (point) {
+        if (point.m <= 6) h1n += 1;
+        else h2n += 1;
+      });
+      var h1 = h2n === 0 ? hours : (h1n === 0 ? 0 : Math.round((hours * h1n / (h1n + h2n)) * 100) / 100);
+      var h2 = h1n === 0 ? hours : Math.round((hours - h1) * 100) / 100;
+      text += ' 1 полугодие — ' + workHoursText(h1) + ', 2 полугодие — ' + workHoursText(h2) + '.';
+    }
+    el.textContent = text;
+  }
+
   function appendWorkReport(body) {
     body.work_edu = workFlag('fWorkEdu');
     body.work_edu_method = workFlag('fWorkEduMethod');
     body.work_research = workFlag('fWorkResearch');
     body.work_org_method = workFlag('fWorkOrgMethod');
-    body.work_period = workText('fWorkPeriod');
+    body.work_start = workText('fWorkStart') || null;
     body.work_indicator = workText('fWorkIndicator');
-    body.work_hours_first = workHours('fWorkHoursH1');
-    body.work_hours_second = workHours('fWorkHoursH2');
+    body.work_hours = workHours('fWorkHours');
     return body;
   }
 
@@ -351,10 +429,18 @@
     setCb('fWorkEduMethod', t.work_edu_method);
     setCb('fWorkResearch', t.work_research);
     setCb('fWorkOrgMethod', t.work_org_method);
-    setVal('fWorkPeriod', t.work_period || '', false);
+    var start = t.work_start ? String(t.work_start).slice(0, 10) : '';
+    setVal('fWorkStart', start, false);
     setVal('fWorkIndicator', t.work_indicator || '', false);
-    setVal('fWorkHoursH1', t.work_hours_first != null && t.work_hours_first !== '' ? t.work_hours_first : '', true);
-    setVal('fWorkHoursH2', t.work_hours_second != null && t.work_hours_second !== '' ? t.work_hours_second : '', true);
+    var hours = t.work_hours;
+    if ((hours == null || hours === '') && (t.work_hours_first || t.work_hours_second)) {
+      var first = parseFloat(t.work_hours_first);
+      var second = parseFloat(t.work_hours_second);
+      var sum = (isFinite(first) ? first : 0) + (isFinite(second) ? second : 0);
+      if (sum > 0) hours = sum;
+    }
+    setVal('fWorkHours', hours != null && hours !== '' ? hours : '', true);
+    refreshWorkSpanPreview();
   }
 
   function openCreateTaskModal(opts) {
@@ -1475,4 +1561,11 @@
         notify('Ошибка: ' + (e.message || ''), 'error');
       });
   }
+
+  ['fDue', 'fWorkStart', 'fWorkHours'].forEach(function (id) {
+    var el = $(id);
+    if (!el) return;
+    el.addEventListener('input', refreshWorkSpanPreview);
+    el.addEventListener('change', refreshWorkSpanPreview);
+  });
 
