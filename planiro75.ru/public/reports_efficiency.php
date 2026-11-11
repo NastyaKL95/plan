@@ -3,9 +3,10 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/includes/bootstrap.php';
 require_once dirname(__DIR__) . '/includes/layout.php';
+require_once dirname(__DIR__) . '/includes/reports_efficiency.php';
 
 $user = require_login();
-$reportsScopeLevel = planner_reports_visibility_level($user);
+$reportsScopeLevel = planner_reports_efficiency_level($user);
 $reportsScopeLead = match ($reportsScopeLevel) {
     'org' => 'Сводка по всей организации за выбранный период.',
     'department' => 'Сводка по вашему подразделению за выбранный период.',

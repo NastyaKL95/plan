@@ -8,11 +8,11 @@ require_once dirname(__DIR__) . '/includes/task_extras.php';
 require_once dirname(__DIR__) . '/includes/reports_efficiency.php';
 
 $hasProjectDept = planner_table_has_column('projects', 'department_id');
-$scope = planner_reports_tasks_scope($user, $hasProjectDept, 'p');
+$scope = planner_reports_efficiency_tasks_scope($user, $hasProjectDept, 'p');
 $tw = planner_scope_org_work_year_task($orgId, 't');
 
 $mode = (string) ($_GET['mode'] ?? 'employees');
-if ($mode === 'departments' && planner_reports_visibility_level($user) === 'self') {
+if ($mode === 'departments' && planner_reports_efficiency_level($user) === 'self') {
     http_response_code(403);
     header('Content-Type: text/plain; charset=UTF-8');
     echo 'Экспорт по подразделениям недоступен: отчёт только по вашим задачам.';

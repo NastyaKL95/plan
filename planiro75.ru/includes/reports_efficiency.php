@@ -2,6 +2,66 @@
 declare(strict_types=1);
 
 /**
+ * Подразделения сотрудника в отчёте эффективности: и те, где он руководитель, и те, где просто состоит.
+ *
+ * @return list<int>
+ */
+function planner_reports_efficiency_department_ids(array $user): array
+{
+    if (planner_reports_visibility_level($user) === 'org') {
+        return [];
+    }
+    $ids = array_merge(
+        planner_reports_department_ids($user),
+        user_department_membership_ids($user)
+    );
+
+    return array_values(array_unique(array_filter(
+        array_map('intval', $ids),
+        static fn (int $id): bool => $id > 0
+    )));
+}
+
+/**
+ * Уровень отчёта эффективности. Сотрудник подразделения видит коллег своего отдела, а не только свои задачи.
+ *
+ * @return 'org'|'department'|'self'
+ */
+function planner_reports_efficiency_level(array $user): string
+{
+    if (planner_reports_visibility_level($user) === 'org') {
+        return 'org';
+    }
+    if (planner_reports_efficiency_department_ids($user) !== []) {
+        return 'department';
+    }
+
+    return 'self';
+}
+
+/**
+ * Задачи отчёта эффективности. Для сотрудника отдела это проекты его подразделений.
+ *
+ * @return array{sql: string, params: array}
+ */
+function planner_reports_efficiency_tasks_scope(array $user, bool $hasProjectDept, string $projectAlias = 'p'): array
+{
+    if (planner_reports_efficiency_level($user) !== 'department') {
+        return planner_reports_tasks_scope($user, $hasProjectDept, $projectAlias);
+    }
+    if (!$hasProjectDept) {
+        return ['sql' => '', 'params' => []];
+    }
+    $ids = planner_reports_efficiency_department_ids($user);
+    if ($ids === []) {
+        return ['sql' => ' AND 1=0 ', 'params' => []];
+    }
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+
+    return ['sql' => " AND {$projectAlias}.department_id IN ($ph) ", 'params' => $ids];
+}
+
+/**
  * Сотрудники отчёта эффективности: все люди подразделения, а не только исполнители задач.
  *
  * @param array{sql: string, params: array} $taskScope
@@ -15,7 +75,7 @@ function planner_reports_efficiency_employees(
     array $taskScope,
     array $workYear
 ): array {
-    $level = planner_reports_visibility_level($user);
+    $level = planner_reports_efficiency_level($user);
     if ($level === 'self') {
         return planner_reports_efficiency_employees_from_tasks($orgId, $rangeExpr, $taskScope, $workYear);
     }
@@ -99,14 +159,14 @@ function planner_reports_efficiency_employees(
  */
 function planner_reports_efficiency_user_scope(array $user): array
 {
-    $level = planner_reports_visibility_level($user);
+    $level = planner_reports_efficiency_level($user);
     if ($level === 'org') {
         return ['sql' => '', 'params' => []];
     }
     if ($level !== 'department') {
         return ['sql' => ' AND u.id = ? ', 'params' => [(int) ($user['id'] ?? 0)]];
     }
-    $ids = planner_reports_department_ids($user);
+    $ids = planner_reports_efficiency_department_ids($user);
     if ($ids === []) {
         return ['sql' => ' AND 1=0 ', 'params' => []];
     }

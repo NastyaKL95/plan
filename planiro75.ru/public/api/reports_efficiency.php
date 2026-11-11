@@ -6,8 +6,8 @@ require_once dirname(__DIR__, 2) . '/includes/task_extras.php';
 require_once dirname(__DIR__, 2) . '/includes/reports_efficiency.php';
 
 $hasProjectDept = planner_table_has_column('projects', 'department_id');
-$scope = planner_reports_tasks_scope($user, $hasProjectDept, 'p');
-$reportsScopeLevel = planner_reports_visibility_level($user);
+$scope = planner_reports_efficiency_tasks_scope($user, $hasProjectDept, 'p');
+$reportsScopeLevel = planner_reports_efficiency_level($user);
 $tw = planner_scope_org_work_year_task($orgId, 't');
 
 $period = (string) ($_GET['period'] ?? '30d');
@@ -38,7 +38,7 @@ $params = array_merge([$orgId], $scope['params'], $tw['params']);
 $fromWhere = ' FROM tasks t INNER JOIN projects p ON p.id = t.project_id WHERE t.organization_id = ?' . $scope['sql'] . $tw['sql'];
 
 $cacheDir = dirname(__DIR__, 2) . '/var/cache/reports-eff';
-$cacheKey = 'e2' . $orgId . '_u' . (int) $user['id'] . '_d' . $days . '_' . md5((string) json_encode($params));
+$cacheKey = 'e3' . $orgId . '_u' . (int) $user['id'] . '_d' . $days . '_' . md5((string) json_encode($params));
 $cacheFile = $cacheDir . '/' . $cacheKey . '.json';
 $cacheTtl = 90;
 if (is_file($cacheFile) && (time() - (int) @filemtime($cacheFile)) < $cacheTtl) {
