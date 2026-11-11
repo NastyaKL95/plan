@@ -118,11 +118,42 @@
     }
     var autoAsg = $('autoAssignee');
     if (autoAsg) {
+      var me = String(window.__PLANNER_USER_ID__ || '');
+      var mine = [];
+      users.forEach(function (u) {
+        if (String(u.id) !== me) return;
+        (u.department_ids || []).forEach(function (id) {
+          var n = parseInt(id, 10);
+          if (n > 0 && mine.indexOf(n) < 0) mine.push(n);
+        });
+        var primary = parseInt(u.department_id, 10);
+        if (primary > 0 && mine.indexOf(primary) < 0) mine.push(primary);
+      });
+      function shares(u) {
+        var ids = [];
+        (u.department_ids || []).forEach(function (id) {
+          var n = parseInt(id, 10);
+          if (n > 0) ids.push(n);
+        });
+        var primary = parseInt(u.department_id, 10);
+        if (primary > 0) ids.push(primary);
+        for (var i = 0; i < ids.length; i++) {
+          if (mine.indexOf(ids[i]) >= 0) return true;
+        }
+        return false;
+      }
       autoAsg.innerHTML =
         '<option value="">— не менять —</option>' +
         users
           .filter(function (u) {
             return !(u && (u.account_status === 'blocked' || u.is_blocked));
+          })
+          .slice()
+          .sort(function (a, b) {
+            var ra = String(a.id) === me ? 0 : shares(a) ? 1 : 2;
+            var rb = String(b.id) === me ? 0 : shares(b) ? 1 : 2;
+            if (ra !== rb) return ra - rb;
+            return String(a.name || '').localeCompare(String(b.name || ''), 'ru');
           })
           .map(function (u) {
             return '<option value="' + u.id + '">' + escapeHtml(u.name) + '</option>';

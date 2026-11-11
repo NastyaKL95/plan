@@ -353,7 +353,7 @@
       if (bulkAsg) {
         bulkAsg.innerHTML =
           '<option value="">Не назначен</option>' +
-          assignableUsers()
+          sortUsersForAssignee(assignableUsers())
             .map(function (u) {
               return '<option value="' + u.id + '">' + escapeHtml(userPickerLabel(u)) + '</option>';
             })
@@ -431,7 +431,7 @@
         }
       }
       var qta = $('quickTaskAssignee');
-      var quickUsers = assignableUsers();
+      var quickUsers = sortUsersForAssignee(assignableUsers());
       if (qta && quickUsers.length) {
         qta.innerHTML = quickUsers
           .map(function (u) {

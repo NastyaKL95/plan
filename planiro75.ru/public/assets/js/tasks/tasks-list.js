@@ -311,6 +311,62 @@
     });
   }
 
+  function userDepartmentIds(u) {
+    var ids = [];
+    if (!u) return ids;
+    if (Array.isArray(u.department_ids)) {
+      u.department_ids.forEach(function (id) {
+        var n = parseInt(id, 10);
+        if (n > 0 && ids.indexOf(n) < 0) ids.push(n);
+      });
+    }
+    var primary = parseInt(u.department_id, 10);
+    if (primary > 0 && ids.indexOf(primary) < 0) ids.push(primary);
+    return ids;
+  }
+
+  function currentUserRecord() {
+    var id = String(currentUserId() || '');
+    if (!id) return null;
+    for (var i = 0; i < users.length; i++) {
+      if (String(users[i].id) === id) return users[i];
+    }
+    return null;
+  }
+
+  function userSharesMyDepartment(u) {
+    var mine = userDepartmentIds(currentUserRecord());
+    if (!mine.length || !u) return false;
+    var theirs = userDepartmentIds(u);
+    for (var i = 0; i < theirs.length; i++) {
+      if (mine.indexOf(theirs[i]) >= 0) return true;
+    }
+    return false;
+  }
+
+  function compareUserName(a, b) {
+    return String((a && a.name) || '').localeCompare(String((b && b.name) || ''), 'ru');
+  }
+
+  function sortUsersForAssignee(list) {
+    var me = String(currentUserId() || '');
+    return (list || []).slice().sort(function (a, b) {
+      var ra = String(a.id) === me ? 0 : userSharesMyDepartment(a) ? 1 : 2;
+      var rb = String(b.id) === me ? 0 : userSharesMyDepartment(b) ? 1 : 2;
+      if (ra !== rb) return ra - rb;
+      return compareUserName(a, b);
+    });
+  }
+
+  function sortUsersForAssistants(list) {
+    return (list || []).slice().sort(function (a, b) {
+      var ra = userSharesMyDepartment(a) ? 0 : 1;
+      var rb = userSharesMyDepartment(b) ? 0 : 1;
+      if (ra !== rb) return ra - rb;
+      return compareUserName(a, b);
+    });
+  }
+
   function userOptionHtml(u) {
     return '<option value="' + u.id + '">' + escapeHtml(userPickerLabel(u)) + '</option>';
   }
@@ -321,14 +377,14 @@
     var current = keepId != null && keepId !== undefined ? keepId : fa.value;
     fa.innerHTML =
       '<option value="">Не назначен</option>' +
-      assignableUsers(current ? [current] : [])
+      sortUsersForAssignee(assignableUsers(current ? [current] : []))
         .map(userOptionHtml)
         .join('');
     if (current) fa.value = String(current);
   }
 
   function fillParticipantSelects(keepAssistantIds) {
-    var assistantOpts = assignableUsers(keepAssistantIds).map(userOptionHtml).join('');
+    var assistantOpts = sortUsersForAssistants(assignableUsers(keepAssistantIds)).map(userOptionHtml).join('');
     var observerOpts = users.map(userOptionHtml).join('');
     var fa = $('fAssistants');
     var fo = $('fObservers');
@@ -498,7 +554,8 @@
           keepIds.push(item.id);
         });
       }
-      sourceList = assignableUsers(keepIds);
+      sourceList =
+        role === 'assignee' ? sortUsersForAssignee(assignableUsers(keepIds)) : sortUsersForAssistants(assignableUsers(keepIds));
     }
     if (role === 'assignee') {
       sourceList = [{ id: '', name: 'Не назначен' }].concat(sourceList);
