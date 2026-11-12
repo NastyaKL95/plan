@@ -22,6 +22,14 @@ $msg = "🧪 Проверка MAX\n"
     . "\nПользователь: " . trim((string) ($user['name'] ?? ''))
     . "\nВремя: " . date('d.m.Y H:i:s');
 
+if (planner_max_user_chat_id($orgId, $userId) === '') {
+    json_response([
+        'ok' => false,
+        'error' => 'max_chat_required',
+        'message' => 'Укажите ID чата MAX в профиле. Без него уведомления не отправляются.',
+    ], 422);
+}
+
 planner_max_queue_user_message($orgId, $userId, $msg);
 
 json_response(['ok' => true, 'queued' => true]);

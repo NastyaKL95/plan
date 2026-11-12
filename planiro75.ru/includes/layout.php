@@ -185,6 +185,7 @@ function layout_end(): void
       1) Откройте чат-бота:
       <a href="https://max.ru/irozabkrai75_bot" target="_blank" rel="noopener noreferrer">@irozabkrai75_bot</a>,
       начните диалог и скопируйте ID чата. 2) Вставьте ID в поле ниже — в этот чат будут приходить уведомления Planner.
+      Если поле пустое, уведомления не отправляются.
     </p>
     <label class="field-label" for="profileMaxChatId">ID чата MAX</label>
     <input type="text" id="profileMaxChatId" class="input-block" inputmode="numeric" maxlength="32" placeholder="Например: 284351356">

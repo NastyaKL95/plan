@@ -54,6 +54,7 @@ layout_start($user, 'Профиль', 'dashboard');
         1) Откройте чат-бота <a href="https://max.ru/irozabkrai75_bot" target="_blank" rel="noopener noreferrer">@irozabkrai75_bot</a>
         и отправьте /start. 2) В ответе бота или в первом сообщении при привязке указан <b>chat_id диалога</b> — его вставьте ниже.
         Не подставляйте user_id аккаунта MAX (другой номер): иначе будет ошибка chat.not.found.
+        Если поле пустое, уведомления этому сотруднику не отправляются.
       </p>
       <label class="field-label" for="pfMaxChatInput">ID чата MAX (chat_id диалога с ботом)</label>
       <input type="text" id="pfMaxChatInput" class="input-block" inputmode="numeric" maxlength="32" placeholder="Например: 284351356">

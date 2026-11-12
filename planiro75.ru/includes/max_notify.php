@@ -541,17 +541,16 @@ function planner_max_task_assistant_ids(int $taskId): array
     ), static fn (int $id): bool => $id > 0)));
 }
 
+/** Личный chat_id из профиля. Пустое поле не подменяется общим чатом: такому сотруднику не пишем. */
 function planner_max_user_chat_id(int $orgId, int $userId): string
 {
-    $runtime = planner_max_runtime_settings($orgId);
-    $fallback = trim((string) ($runtime['chat_id'] ?? ''));
-    if ($userId <= 0 || !planner_table_has_column('users', 'max_chat_id')) {
-        return $fallback;
+    if ($orgId <= 0 || $userId <= 0 || !planner_table_has_column('users', 'max_chat_id')) {
+        return '';
     }
     $st = db()->prepare('SELECT max_chat_id FROM users WHERE id = ? AND organization_id = ? LIMIT 1');
     $st->execute([$userId, $orgId]);
-    $personal = trim((string) ($st->fetchColumn() ?: ''));
-    return $personal !== '' ? $personal : $fallback;
+
+    return trim((string) ($st->fetchColumn() ?: ''));
 }
 
 function planner_max_events_table_ready(): bool
@@ -1389,7 +1388,7 @@ function planner_max_process_queue(int $limit = 100, int $maxBatches = 8): array
         } catch (Throwable $e) {
             $payload = [];
         }
-        $chatId = trim((string) ($payload['chat_id'] ?? planner_max_user_chat_id($orgId, $userId)));
+        $chatId = planner_max_user_chat_id($orgId, $userId);
         $text = trim((string) ($payload['text'] ?? ''));
         $eventType = trim((string) ($r['event_type'] ?? ''));
         $messageId = trim((string) ($payload['message_id'] ?? ''));
@@ -1398,7 +1397,7 @@ function planner_max_process_queue(int $limit = 100, int $maxBatches = 8): array
         }
         if ($chatId === '' || $text === '') {
             db()->prepare("UPDATE notification_events SET status = 'cancelled', last_error = ? WHERE id = ?")
-                ->execute(['empty_chat_or_text', $id]);
+                ->execute([$chatId === '' ? 'no_personal_chat' : 'empty_chat_or_text', $id]);
             $out['skipped']++;
             continue;
         }

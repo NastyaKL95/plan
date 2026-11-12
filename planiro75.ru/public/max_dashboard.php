@@ -69,8 +69,9 @@ layout_start($user, 'Мониторинг MAX', 'max_dashboard');
       <label class="field-label" for="mxWebhookSecret">Webhook secret (для /api/max_webhook.php?secret=...)</label>
       <input type="text" id="mxWebhookSecret" class="input-block" placeholder="Секрет для входящего webhook">
       <label class="bx-check-row"><input type="checkbox" id="mxRemoveWebhookSecret"> Удалить webhook secret</label>
-      <label class="field-label" for="mxChatInput">Fallback chat_id</label>
+      <label class="field-label" for="mxChatInput">Общий chat_id</label>
       <input type="text" id="mxChatInput" class="input-block" placeholder="Например: 284351356">
+      <p class="muted bx-profile-lead2">Личные уведомления сюда не подставляются. Сотруднику без своего chat_id в профиле сообщение не отправляется.</p>
       <div class="form-row max-form-row">
         <div>
           <label class="field-label" for="mxQuietStart">Quiet start</label>
