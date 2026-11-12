@@ -30,6 +30,8 @@ CREATE TABLE organizations (
   name VARCHAR(255) NOT NULL,
   work_year SMALLINT UNSIGNED NOT NULL DEFAULT 2026 COMMENT 'Год работы организации',
   default_due_time CHAR(5) NOT NULL DEFAULT '18:00' COMMENT 'Время срока по умолчанию (HH:MM)',
+  maintenance_enabled TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 — сайт на техническом обслуживании',
+  maintenance_message VARCHAR(500) NULL COMMENT 'Текст заглушки для сотрудников',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

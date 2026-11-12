@@ -16,6 +16,8 @@ if ($loginBlock !== null) {
     json_response(['ok' => false, 'error' => 'account_blocked', 'message' => $loginBlock], 403);
 }
 
+planner_maintenance_enforce_api($user);
+
 planner_require_csrf_for_mutating_api();
 
 $orgId = (int) $user['organization_id'];

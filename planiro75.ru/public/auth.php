@@ -70,6 +70,7 @@ if (isset($_GET['error'])) {
         'yandex_login_failed' => 'Не удалось выполнить вход через Яндекс',
         'yandex_email_domain_not_allowed' => 'Неправильная почта',
         'yandex_registration_closed' => 'Регистрация закрыта. Обратитесь к администратору.',
+        'maintenance' => 'Сейчас идёт техническое обслуживание. Регистрация временно закрыта.',
         'yandex_pending_approval' => 'Аккаунт создан. Дождитесь назначения роли и подразделения администратором.',
     ];
     if (isset($map[$oauthError])) {
@@ -82,8 +83,16 @@ $loginEmail = trim((string) ($_POST['login_email'] ?? ''));
 $registerName = trim((string) ($_POST['register_name'] ?? ''));
 $registerEmail = trim((string) ($_POST['register_email'] ?? ''));
 
+$maintenanceOn = $orgId > 0 && planner_maintenance_is_enabled($orgId);
+if ($maintenanceOn && $mode === 'register' && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+    planner_maintenance_render_page($orgId, false);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = (string) ($_POST['auth_action'] ?? '');
+    if ($maintenanceOn && ($action === 'register' || $action === 'resend_verify')) {
+        planner_maintenance_render_page($orgId, false);
+    }
     if ($action === 'resend_verify') {
         $mode = 'register';
         $email = trim((string) ($_POST['resend_email'] ?? ''));
@@ -287,6 +296,7 @@ if ($registerSuccess) {
         <div class="auth-form-screen<?= $mode === 'login' ? ' is-active' : '' ?>" data-mode="login">
           <div class="auth-brand auth-brand--mini">Вектор</div>
           <h1 class="auth-title">Авторизация</h1>
+          <?php if ($maintenanceOn): ?><p class="auth-hint">Сейчас идёт техническое обслуживание. Войти и работать может только администратор.</p><?php endif; ?>
           <?php if ($loginNotice !== ''): ?><div class="alert alert-success"><?= htmlspecialchars($loginNotice, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
           <?php if ($loginError !== ''): ?><div class="alert alert-error"><?= htmlspecialchars($loginError, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
           <form method="post" class="auth-form">

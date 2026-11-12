@@ -260,6 +260,9 @@ try {
     if (!planner_registration_public_open()) {
         throw new RuntimeException('registration_closed');
     }
+    if (planner_maintenance_is_enabled($orgId)) {
+        throw new RuntimeException('maintenance');
+    }
 
     $passwordStub = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
     if ($passwordStub === false) {
@@ -319,6 +322,9 @@ try {
     }
     if ($e->getMessage() === 'registration_closed') {
         yandex_callback_fail('yandex_registration_closed');
+    }
+    if ($e->getMessage() === 'maintenance') {
+        yandex_callback_fail('maintenance');
     }
     yandex_callback_fail('yandex_login_failed');
 }

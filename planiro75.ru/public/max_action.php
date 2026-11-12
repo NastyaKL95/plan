@@ -31,6 +31,10 @@ $taskId = (int) ($row['task_id'] ?? 0);
 $userId = (int) ($row['user_id'] ?? 0);
 $action = trim((string) ($row['action'] ?? ''));
 
+if (planner_maintenance_blocks_user_id($orgId, $userId)) {
+    planner_maintenance_render_page($orgId, false);
+}
+
 if ($action === 'open') {
     db()->prepare('UPDATE max_action_tokens SET used_at = NOW() WHERE token = ? AND used_at IS NULL')->execute([$token]);
     header('Location: ' . planner_url('/tasks.php?open=' . $taskId), true, 302);

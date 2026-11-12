@@ -369,6 +369,7 @@ function require_login(): array
         header('Location: ' . planner_url('/login.php'), true, 302);
         exit;
     }
+    planner_maintenance_enforce_page($u);
     return $u;
 }
 
@@ -475,6 +476,7 @@ function log_activity(int $orgId, ?int $userId, string $action, string $entityTy
     $st->execute([$orgId, $userId, $action, $entityType, $entityId, $message]);
 }
 
+require_once __DIR__ . '/maintenance.php';
 require_once __DIR__ . '/roles.php';
 require_once __DIR__ . '/access.php';
 require_once __DIR__ . '/registration.php';

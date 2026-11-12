@@ -39,6 +39,20 @@ layout_start($user, 'План года', 'plan_year');
   </section>
 
   <section class="panel plan-year-panel">
+    <h2 class="panel-title">Техническое обслуживание</h2>
+    <p class="muted">Пока режим включён, сотрудники видят заглушку и не могут открывать задачи. Администратор входит как обычно и выключает режим здесь.</p>
+    <label class="maint-toggle" for="maintenanceEnabled">
+      <input type="checkbox" id="maintenanceEnabled">
+      <span>Включить режим обслуживания</span>
+    </label>
+    <label class="field-label" for="maintenanceMessage">Текст для сотрудников</label>
+    <textarea id="maintenanceMessage" class="input-block" rows="3" maxlength="500" placeholder="Идут технические работы. Планировщик скоро снова будет доступен."></textarea>
+    <div class="plan-year-import-actions">
+      <button type="button" class="btn btn-primary" id="maintenanceSave">Сохранить</button>
+    </div>
+  </section>
+
+  <section class="panel plan-year-panel">
     <h2 class="panel-title">Импорт задач из Excel (.xlsx)</h2>
     <p class="muted">Колонки можно задать заголовками в первой строке (см. шаблон) или использовать порядок по умолчанию: задача, проект, подразделение, срок, email исполнителя. В колонке «Срок» — дата (31.12.2026, Excel «Дата»); время подставится из настройки организации (профиль администратора или MAX: /settings due_time 18:00). Выгрузка года — в том же формате; повторный импорт создаёт новые задачи.</p>
     <div class="plan-year-template-actions">

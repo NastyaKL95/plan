@@ -10,6 +10,7 @@ if (!$user) {
     echo 'Доступ запрещён';
     exit;
 }
+planner_maintenance_enforce_page($user);
 
 $orgId = (int) $user['organization_id'];
 $id = (int) ($_GET['attachment'] ?? $_GET['id'] ?? 0);

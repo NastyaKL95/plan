@@ -28,6 +28,46 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
+    var maintEnabled = $('maintenanceEnabled');
+    var maintMessage = $('maintenanceMessage');
+    var maintSave = $('maintenanceSave');
+    if (maintEnabled && maintMessage) {
+      Core.api('/api/organization.php')
+        .then(function (r) {
+          maintEnabled.checked = !!(r && r.maintenance_enabled);
+          maintMessage.value = r && r.maintenance_message ? String(r.maintenance_message) : '';
+        })
+        .catch(function () {});
+    }
+    if (maintSave && maintEnabled && maintMessage) {
+      maintSave.addEventListener('click', function () {
+        Core.api(
+          '/api/organization.php',
+          {
+            method: 'PATCH',
+            body: {
+              maintenance_enabled: maintEnabled.checked,
+              maintenance_message: maintMessage.value,
+            },
+          },
+          {
+            forbidden: 'Недостаточно прав',
+            schema: 'Не удалось подготовить поля обслуживания в базе',
+            error: 'Не удалось сохранить',
+          }
+        )
+          .then(function (r) {
+            maintEnabled.checked = !!(r && r.maintenance_enabled);
+            if (r && r.maintenance_message != null) maintMessage.value = String(r.maintenance_message);
+            notify(r && r.maintenance_enabled ? 'Режим обслуживания включён' : 'Режим обслуживания выключен', 'success');
+            window.setTimeout(function () { window.location.reload(); }, 400);
+          })
+          .catch(function (e) {
+            notify(e.message || 'Ошибка', 'error');
+          });
+      });
+    }
+
     var save = $('planYearSave');
     var inp = $('planYearInput');
     var exportYearEl = $('planImportYear');

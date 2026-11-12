@@ -28,12 +28,15 @@ if ($method === 'GET') {
             $dueHm = $raw;
         }
     }
+    $maintenance = planner_maintenance_state($orgId);
     json_response([
         'ok' => true,
         'name' => (string) $row['name'],
         'work_year' => (int) $row['work_year'],
         'default_due_time' => $dueHm,
         'default_due_time_hms' => planner_org_default_due_time_hms($orgId),
+        'maintenance_enabled' => $maintenance['enabled'],
+        'maintenance_message' => $maintenance['message'],
     ]);
 }
 
@@ -45,6 +48,22 @@ if ($method === 'PATCH' || $method === 'PUT') {
     $updates = [];
     $params = [];
     $logParts = [];
+    $maintenanceOut = null;
+
+    if (array_key_exists('maintenance_enabled', $body) || array_key_exists('maintenance_message', $body)) {
+        if (!user_is_organization_admin($user)) {
+            json_response(['ok' => false, 'error' => 'forbidden'], 403);
+        }
+        $fields = [];
+        if (array_key_exists('maintenance_enabled', $body)) {
+            $fields['enabled'] = (bool) $body['maintenance_enabled'];
+        }
+        if (array_key_exists('maintenance_message', $body)) {
+            $fields['message'] = (string) $body['maintenance_message'];
+        }
+        $maintenanceOut = planner_maintenance_save($orgId, $fields);
+        $logParts[] = $maintenanceOut['enabled'] ? 'обслуживание включено' : 'обслуживание выключено';
+    }
 
     if (array_key_exists('work_year', $body)) {
         $y = (int) $body['work_year'];
@@ -66,12 +85,14 @@ if ($method === 'PATCH' || $method === 'PUT') {
         $logParts[] = 'срок по умолчанию ' . $hm;
     }
 
-    if ($updates === []) {
+    if ($updates === [] && $maintenanceOut === null) {
         json_response(['ok' => false, 'error' => 'no_fields'], 400);
     }
 
-    $params[] = $orgId;
-    db()->prepare('UPDATE organizations SET ' . implode(', ', $updates) . ' WHERE id = ?')->execute($params);
+    if ($updates !== []) {
+        $params[] = $orgId;
+        db()->prepare('UPDATE organizations SET ' . implode(', ', $updates) . ' WHERE id = ?')->execute($params);
+    }
     log_activity(
         $orgId,
         $userId,
@@ -88,6 +109,10 @@ if ($method === 'PATCH' || $method === 'PUT') {
     if ($hasDueTime && array_key_exists('default_due_time', $body)) {
         $out['default_due_time'] = trim((string) $body['default_due_time']);
         $out['default_due_time_hms'] = planner_org_default_due_time_hms($orgId);
+    }
+    if ($maintenanceOut !== null) {
+        $out['maintenance_enabled'] = $maintenanceOut['enabled'];
+        $out['maintenance_message'] = $maintenanceOut['message'];
     }
     json_response($out);
 }

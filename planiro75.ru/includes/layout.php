@@ -149,6 +149,13 @@ function layout_start(array $user, string $title, string $active = 'dashboard'):
     </header>
     <main class="content-wrap bx-content">
 <?php
+    if (function_exists('user_may_access_org_plan_console') && user_may_access_org_plan_console($user) && function_exists('planner_maintenance_state')) {
+        $maint = planner_maintenance_state((int) ($user['organization_id'] ?? 0));
+        if (!empty($maint['enabled'])) {
+            $maintHref = htmlspecialchars(planner_url('/plan_year.php'), ENT_QUOTES, 'UTF-8');
+            echo '<div class="maint-banner" role="status">Режим технического обслуживания включён. Сотрудники видят заглушку. <a href="' . $maintHref . '">Выключить</a></div>';
+        }
+    }
 }
 
 function layout_end(): void
