@@ -22,6 +22,8 @@
 - `realnye/` — **реальные олимпиадные** с источниками и ссылками на PDF
 - `dopolnitelno/` — ещё задачи на те же темы
 - `office/` — Word и PowerPoint
+  - `Realnye_olimpiadnye.docx` — раздатка по реальным задачам
+  - `Prezentaciya_realnye_olimpiadnye.pptx` — презентация по реальным задачам
 - `solutions/` — код к учебным / ключевым
 
 Подробный тайминг: `programma.md`.
