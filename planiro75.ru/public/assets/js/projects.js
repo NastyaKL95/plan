@@ -26,6 +26,7 @@
   var projects = [];
   var collapsedPortfolioIds = {};
   var canDeletePortfolios = false;
+  var canCreateProjects = false;
 
   function fillDeptSelect() {
     var sel = $('projDept');
@@ -164,9 +165,12 @@
         pf.id +
         '" hidden><button type="button" class="portfolio-menu-item portfolio-edit" data-id="' +
         pf.id +
-        '">Изменить</button><button type="button" class="portfolio-menu-item portfolio-add-child" data-id="' +
-        pf.id +
-        '">Добавить дочерний</button>' +
+        '">Изменить</button>' +
+        (canCreateProjects
+          ? '<button type="button" class="portfolio-menu-item portfolio-add-child" data-id="' +
+            pf.id +
+            '">Добавить дочерний</button>'
+          : '') +
         (canDeletePortfolios
           ? '<button type="button" class="portfolio-menu-item is-danger portfolio-delete" data-id="' +
             pf.id +
@@ -209,7 +213,9 @@
     if (roots.length) {
       html += '<div class="portfolio-tree">' + roots.map(renderPortfolioNode).join('') + '</div>';
     } else {
-      html += '<p class="muted">Пока нет портфелей. Создайте первый портфель кнопкой сверху.</p>';
+      html += canCreateProjects
+        ? '<p class="muted">Пока нет портфелей. Создайте первый портфель кнопкой сверху.</p>'
+        : '<p class="muted">Пока нет портфелей.</p>';
     }
     html += '<section class="portfolio-unassigned"><h3>Проекты без портфеля</h3>';
     html +=
@@ -554,6 +560,10 @@
         projects = res[1].items || [];
         portfolios = res[2].items || [];
         canDeletePortfolios = !!(res[2] && res[2].can_delete);
+        canCreateProjects = !!(
+          (res[1] && res[1].can_create) ||
+          (res[2] && res[2].can_create)
+        );
         fillDeptSelect();
         fillPortfolioParentSelect();
         fillPortfolioProjectSelect();
@@ -567,7 +577,7 @@
   document.addEventListener('DOMContentLoaded', function () {
     var modal = $('projectModal');
     var portfolioModal = $('portfolioModal');
-    $('btnNewProject').addEventListener('click', openProjectCreate);
+    if ($('btnNewProject')) $('btnNewProject').addEventListener('click', openProjectCreate);
     $('projCancel').addEventListener('click', function () {
       if (typeof modal.close === 'function') modal.close();
       else modal.removeAttribute('open');

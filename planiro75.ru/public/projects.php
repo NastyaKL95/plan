@@ -13,10 +13,12 @@ layout_start($user, 'Проекты', 'projects');
 
 <div class="page-head">
   <h1 class="page-title">Проекты</h1>
+  <?php if (user_may_create_projects_and_portfolios($user)): ?>
   <div class="page-actions">
     <button type="button" class="btn btn-secondary" id="btnNewPortfolio">Новый портфель</button>
     <button type="button" class="btn btn-primary" id="btnNewProject">Новый проект</button>
   </div>
+  <?php endif; ?>
 </div>
 
 <div class="projects-grid" id="projectsGrid"></div>

@@ -4,7 +4,12 @@ declare(strict_types=1);
 require __DIR__ . '/_guard.php';
 
 if (!planner_table_exists('project_portfolios')) {
-    json_response(['ok' => true, 'items' => []]);
+    json_response([
+        'ok' => true,
+        'items' => [],
+        'can_delete' => user_may_delete_portfolio($user),
+        'can_create' => user_may_create_projects_and_portfolios($user),
+    ]);
 }
 
 $pw = planner_scope_org_work_year_project($orgId, 'p');
@@ -77,10 +82,18 @@ if ($method === 'GET') {
         'ok' => true,
         'items' => $items,
         'can_delete' => user_may_delete_portfolio($user),
+        'can_create' => user_may_create_projects_and_portfolios($user),
     ]);
 }
 
 if ($method === 'POST') {
+    if (!user_may_create_projects_and_portfolios($user)) {
+        json_response([
+            'ok' => false,
+            'error' => 'create_forbidden',
+            'message' => 'Создавать проекты и портфели могут администратор, ректорат и руководитель подразделения.',
+        ], 403);
+    }
     $body = read_json_body();
     $name = trim((string) ($body['name'] ?? ''));
     if ($name === '') {

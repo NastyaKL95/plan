@@ -630,6 +630,25 @@ function user_is_organization_admin(array $user): bool
     return in_array($user['role'] ?? '', ['admin', 'owner'], true);
 }
 
+/**
+ * Создание проекта и портфеля: администратор организации, сотрудник ректората
+ * или руководитель подразделения. Обычный сотрудник подразделения — нет.
+ */
+function user_may_create_projects_and_portfolios(array $user): bool
+{
+    if (user_is_organization_admin($user)) {
+        return true;
+    }
+    if (user_is_institute_manager($user) || user_is_rectorate_department_member($user)) {
+        return true;
+    }
+    if (($user['role'] ?? '') === 'head') {
+        return true;
+    }
+
+    return user_managed_department_ids($user) !== [];
+}
+
 /** Удаление портфеля — только администратор организации. */
 function user_may_delete_portfolio(array $user): bool
 {

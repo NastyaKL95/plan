@@ -66,8 +66,19 @@ if ($method === 'GET') {
         }
         unset($it);
     }
-    json_response(['ok' => true, 'items' => $items]);
+    json_response([
+        'ok' => true,
+        'items' => $items,
+        'can_create' => user_may_create_projects_and_portfolios($user),
+    ]);
 } elseif ($method === 'POST') {
+    if (!user_may_create_projects_and_portfolios($user)) {
+        json_response([
+            'ok' => false,
+            'error' => 'create_forbidden',
+            'message' => 'Создавать проекты и портфели могут администратор, ректорат и руководитель подразделения.',
+        ], 403);
+    }
     $body = read_json_body();
     $name = trim((string) ($body['name'] ?? ''));
     if ($name === '') {
