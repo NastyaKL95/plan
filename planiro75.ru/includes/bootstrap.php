@@ -1,12 +1,44 @@
 <?php
 declare(strict_types=1);
 
-$configPath = dirname(__DIR__) . '/config/config.php';
-$localPath = dirname(__DIR__) . '/config/config.local.php';
+$root = dirname(__DIR__);
+$configCandidates = [
+    $root . '/config/config.php',
+    $root . '/planiro75.ru/config/config.php',
+];
+$localCandidates = [
+    $root . '/config/config.local.php',
+    $root . '/planiro75.ru/config/config.local.php',
+];
+$configPath = null;
+foreach ($configCandidates as $candidate) {
+    if (is_file($candidate)) {
+        $configPath = $candidate;
+        break;
+    }
+}
+if ($configPath === null) {
+    http_response_code(500);
+    header('Content-Type: text/html; charset=UTF-8');
+    echo '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Нет конфигурации</title></head><body>';
+    echo '<p>Не найден файл <code>config/config.php</code> рядом с папкой <code>includes</code>.</p>';
+    echo '<p>Положите его в <code>' . htmlspecialchars($root . '/config/config.php', ENT_QUOTES, 'UTF-8') . '</code>.</p>';
+    echo '</body></html>';
+    exit;
+}
 $config = require $configPath;
-if (is_file($localPath)) {
-    $local = require $localPath;
-    $config = array_replace_recursive($config, $local);
+if (!is_array($config)) {
+    $config = [];
+}
+foreach ($localCandidates as $candidate) {
+    if (!is_file($candidate)) {
+        continue;
+    }
+    $local = require $candidate;
+    if (is_array($local)) {
+        $config = array_replace_recursive($config, $local);
+    }
+    break;
 }
 
 session_name($config['app']['session_name']);
