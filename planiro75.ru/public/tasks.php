@@ -250,8 +250,10 @@ window.__PLANNER_USER_DEPT_ID__=<?= json_encode(isset($user['department_id']) &&
   <div class="task-cal-nav">
     <button type="button" class="btn btn-secondary" id="taskCalPrev" aria-label="Предыдущий месяц">←</button>
     <h2 class="task-cal-title" id="taskCalMonthTitle"></h2>
+    <button type="button" class="btn btn-secondary" id="taskCalToday">Сегодня</button>
     <button type="button" class="btn btn-secondary" id="taskCalNext" aria-label="Следующий месяц">→</button>
   </div>
+  <p class="muted task-cal-lead">Задачи со сроком в этом месяце. Нажмите задачу, чтобы открыть её.</p>
   <div class="task-cal-weekdays">
     <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
   </div>

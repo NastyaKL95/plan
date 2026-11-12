@@ -1310,6 +1310,8 @@
     return { y: d.getFullYear(), m: d.getMonth(), day: d.getDate() };
   }
 
+  var calendarExpandedDays = {};
+
   function tasksForCalendarDay(y, m, dayNum) {
     return tasksCache.filter(function (t) {
       if (!t.due_date) return false;
@@ -1317,6 +1319,12 @@
       var p = calendarCellDateParts(t.due_date);
       return p && p.y === y && p.m === m && p.day === dayNum;
     });
+  }
+
+  function calendarDueClock(val) {
+    var m = String(val || '').match(/(\d{2}):(\d{2})/);
+    if (!m || (m[1] === '00' && m[2] === '00')) return '';
+    return m[1] + ':' + m[2];
   }
 
   function renderCalendar() {
@@ -1328,30 +1336,51 @@
     var first = new Date(calendarYear, calendarMonth, 1);
     var startOffset = (first.getDay() + 6) % 7;
     var totalCells = Math.ceil((startOffset + dim) / 7) * 7;
+    var today = new Date();
     var html = '';
     for (var i = 0; i < totalCells; i++) {
+      var weekend = i % 7 >= 5;
       if (i < startOffset || i >= startOffset + dim) {
-        html += '<div class="task-cal-cell task-cal-cell--muted"></div>';
+        html += '<div class="task-cal-cell task-cal-cell--muted' + (weekend ? ' task-cal-cell--weekend' : '') + '"></div>';
         continue;
       }
       var dayNum = i - startOffset + 1;
       var dayTasks = tasksForCalendarDay(calendarYear, calendarMonth, dayNum);
-      var chips = dayTasks
+      var expanded = !!calendarExpandedDays[dayNum];
+      var visibleTasks = expanded ? dayTasks : dayTasks.slice(0, 3);
+      var chips = visibleTasks
         .map(function (t) {
+          var clock = calendarDueClock(t.due_date);
+          var label = (clock ? clock + ' ' : '') + (t.title || '');
           return (
             '<button type="button" class="task-cal-chip' +
             (taskIsOverdue(t) ? ' task-cal-chip--overdue' : '') +
             (isQuickTaskItem(t) ? ' task-cal-chip--quick' : '') +
             '" data-id="' +
             t.id +
+            '" title="' +
+            escapeHtml(label) +
             '">' +
-            escapeHtml(t.title || '') +
+            escapeHtml(label) +
             '</button>'
           );
         })
         .join('');
+      if (!expanded && dayTasks.length > 3) {
+        chips +=
+          '<button type="button" class="task-cal-more" data-day="' +
+          dayNum +
+          '">ещё ' +
+          (dayTasks.length - 3) +
+          '</button>';
+      }
+      var isToday =
+        today.getFullYear() === calendarYear && today.getMonth() === calendarMonth && today.getDate() === dayNum;
       html +=
-        '<div class="task-cal-cell"><div class="task-cal-daynum">' +
+        '<div class="task-cal-cell' +
+        (weekend ? ' task-cal-cell--weekend' : '') +
+        (isToday ? ' task-cal-cell--today' : '') +
+        '"><div class="task-cal-daynum">' +
         dayNum +
         '</div><div class="task-cal-chips">' +
         chips +
@@ -1361,6 +1390,12 @@
     grid.querySelectorAll('.task-cal-chip').forEach(function (btn) {
       btn.addEventListener('click', function () {
         openDrawer(parseInt(btn.getAttribute('data-id'), 10));
+      });
+    });
+    grid.querySelectorAll('.task-cal-more').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        calendarExpandedDays[btn.getAttribute('data-day')] = true;
+        renderCalendar();
       });
     });
   }
@@ -1375,6 +1410,15 @@
       calendarMonth = 11;
       calendarYear--;
     }
+    calendarExpandedDays = {};
+    renderCalendar();
+  }
+
+  function showCalendarToday() {
+    var now = new Date();
+    calendarYear = now.getFullYear();
+    calendarMonth = now.getMonth();
+    calendarExpandedDays = {};
     renderCalendar();
   }
 

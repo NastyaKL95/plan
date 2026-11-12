@@ -540,6 +540,9 @@
     if ($('taskCalNext')) $('taskCalNext').addEventListener('click', function () {
       shiftCalendarMonth(1);
     });
+    if ($('taskCalToday')) $('taskCalToday').addEventListener('click', function () {
+      showCalendarToday();
+    });
 
     var selAllHdr = $('taskSelectAll');
     if (selAllHdr) {
