@@ -1313,8 +1313,6 @@
     return { y: d.getFullYear(), m: d.getMonth(), day: d.getDate() };
   }
 
-  var calendarExpandedDays = {};
-
   function tasksForCalendarDay(y, m, dayNum) {
     return tasksCache.filter(function (t) {
       if (!t.due_date) return false;
@@ -1349,9 +1347,7 @@
       }
       var dayNum = i - startOffset + 1;
       var dayTasks = tasksForCalendarDay(calendarYear, calendarMonth, dayNum);
-      var expanded = !!calendarExpandedDays[dayNum];
-      var visibleTasks = expanded ? dayTasks : dayTasks.slice(0, 3);
-      var chips = visibleTasks
+      var chips = dayTasks
         .map(function (t) {
           var clock = calendarDueClock(t.due_date);
           var label = (clock ? clock + ' ' : '') + (t.title || '');
@@ -1369,14 +1365,6 @@
           );
         })
         .join('');
-      if (!expanded && dayTasks.length > 3) {
-        chips +=
-          '<button type="button" class="task-cal-more" data-day="' +
-          dayNum +
-          '">ещё ' +
-          (dayTasks.length - 3) +
-          '</button>';
-      }
       var isToday =
         today.getFullYear() === calendarYear && today.getMonth() === calendarMonth && today.getDate() === dayNum;
       html +=
@@ -1395,12 +1383,6 @@
         openDrawer(parseInt(btn.getAttribute('data-id'), 10));
       });
     });
-    grid.querySelectorAll('.task-cal-more').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        calendarExpandedDays[btn.getAttribute('data-day')] = true;
-        renderCalendar();
-      });
-    });
   }
 
   function shiftCalendarMonth(delta) {
@@ -1413,7 +1395,6 @@
       calendarMonth = 11;
       calendarYear--;
     }
-    calendarExpandedDays = {};
     renderCalendar();
   }
 
@@ -1421,7 +1402,6 @@
     var now = new Date();
     calendarYear = now.getFullYear();
     calendarMonth = now.getMonth();
-    calendarExpandedDays = {};
     renderCalendar();
   }
 
