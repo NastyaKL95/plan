@@ -36,7 +36,7 @@ layout_start($user, 'Отчёты', 'reports');
 <div class="reports-grid">
 <section class="report-card report-card--wide" id="teacherReportSection">
   <h2>Индивидуальный план/отчёт преподавателя</h2>
-  <p class="muted report-lead-stuck">Word-файл в том же виде, что образец: шапка, сводка часов и четыре раздела работ. В карточке задачи отметьте вид работы, дату начала и часы. Срок в отчёте — месяцы до крайнего срока, часы полугодий делятся по этим месяцам. В отчёт попадают задачи, где сотрудник исполнитель или соисполнитель, за текущий год плана, кроме отменённых.</p>
+  <p class="muted report-lead-stuck">Два файла Word в том же виде, что образец: шапка, сводка часов и четыре раздела работ. В карточке задачи отметьте вид работы, дату начала и часы. Срок — месяцы до крайнего срока, часы полугодий делятся по этим месяцам. Берутся задачи, где сотрудник исполнитель или соисполнитель, за текущий год плана. План включает все отмеченные, и выполненные, и ещё не выполненные. Отчёт — только выполненные отмеченные. Отменённые не входят.</p>
   <?php if (!$teacherReportReady): ?>
   <p class="muted">Поля отчёта в базе пока не созданы. Выполните <code>sql/migration_teacher_report_v1.sql</code>.</p>
   <?php elseif ($teacherReportUsers === []): ?>
@@ -101,7 +101,8 @@ layout_start($user, 'Отчёты', 'reports');
     </div>
     <p class="muted" id="teacherReportSaveNote" hidden>Для другого сотрудника эти поля попадут только в файл. Должность и плановые часы в его карточке не изменятся.</p>
     <div class="teacher-report-actions">
-      <button type="submit" class="btn btn-primary">Скачать Word</button>
+      <button type="submit" class="btn btn-secondary" name="mode" value="plan">План</button>
+      <button type="submit" class="btn btn-primary" name="mode" value="report">Отчёт</button>
     </div>
   </form>
   <?php endif; ?>

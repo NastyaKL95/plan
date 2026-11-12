@@ -449,7 +449,7 @@ function planner_teacher_report_save_card(int $userId, int $orgId, array $card):
 /**
  * @return list<array<string, mixed>>
  */
-function planner_teacher_report_tasks(int $orgId, int $userId, int $year): array
+function planner_teacher_report_tasks(int $orgId, int $userId, int $year, string $mode = 'plan'): array
 {
     if (!planner_table_has_column('tasks', 'work_edu') || !planner_table_has_column('tasks', 'work_hours_first')) {
         return [];
@@ -476,7 +476,7 @@ function planner_teacher_report_tasks(int $orgId, int $userId, int $year): array
         . $extra . '
          FROM tasks t
          WHERE t.organization_id = ?
-           AND t.status <> \'cancelled\'
+           AND ' . ($mode === 'report' ? 't.status = \'done\'' : 't.status <> \'cancelled\'') . '
            AND (t.assignee_id = ? OR (t.assignee_id IS NULL AND t.author_id = ?)' . $assistantSql . ')
            AND (t.work_edu = 1 OR t.work_edu_method = 1 OR t.work_research = 1 OR t.work_org_method = 1)'
         . $yearSql
@@ -697,7 +697,7 @@ function planner_teacher_report_half_hours(array $task): array
  * @param array<string, mixed> $subject
  * @param list<array<string, mixed>> $tasks
  */
-function planner_teacher_report_docx(array $subject, array $tasks, int $year): string
+function planner_teacher_report_docx(array $subject, array $tasks, int $year, string $mode = 'plan'): string
 {
     $fio = planner_teacher_report_split_fio((string) ($subject['name'] ?? ''));
     $org = trim((string) ($subject['organization_name'] ?? ''));
@@ -727,7 +727,14 @@ function planner_teacher_report_docx(array $subject, array $tasks, int $year): s
         $body .= planner_docx_p($deptUpper, 'center', true, 24);
     }
     $body .= planner_docx_p('«УТВЕРЖДАЮ»', 'right', true, 22);
-    $body .= planner_docx_p('ИНДИВИДУАЛЬНЫЙ ПЛАН/ОТЧЁТ РАБОТЫ ПРЕПОДАВАТЕЛЯ', 'center', true, 28);
+    $body .= planner_docx_p(
+        $mode === 'report'
+            ? 'ИНДИВИДУАЛЬНЫЙ ОТЧЁТ РАБОТЫ ПРЕПОДАВАТЕЛЯ'
+            : 'ИНДИВИДУАЛЬНЫЙ ПЛАН РАБОТЫ ПРЕПОДАВАТЕЛЯ',
+        'center',
+        true,
+        28
+    );
     $body .= planner_docx_p('Руководитель структурного подразделения ___________ / ___________ /', 'right', false, 20);
     $body .= planner_docx_p((string) $year . ' год', 'center', true, 24);
     $body .= planner_docx_p(date('d.m.Y') . ' г.', 'right', false, 20);

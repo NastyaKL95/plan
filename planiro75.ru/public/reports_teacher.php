@@ -59,10 +59,14 @@ foreach ($card as $key => $value) {
     }
 }
 
+$mode = (string) ($_POST['mode'] ?? 'plan');
+if (!in_array($mode, ['plan', 'report'], true)) {
+    $mode = 'plan';
+}
 $year = planner_org_work_year_for_org($orgId);
-$tasks = planner_teacher_report_tasks($orgId, $subjectId, $year);
+$tasks = planner_teacher_report_tasks($orgId, $subjectId, $year, $mode);
 try {
-    $binary = planner_teacher_report_docx($subject, $tasks, $year);
+    $binary = planner_teacher_report_docx($subject, $tasks, $year, $mode);
 } catch (Throwable $e) {
     http_response_code(500);
     echo 'Не удалось собрать документ Word.';
@@ -70,7 +74,11 @@ try {
 }
 
 $fio = planner_teacher_report_split_fio((string) ($subject['name'] ?? ''));
-$downloadName = 'Отчет ' . ($fio['last'] !== '' ? $fio['last'] : 'преподавателя') . ' ' . $year . '.docx';
+$downloadName = ($mode === 'report' ? 'Отчет ' : 'План ')
+    . ($fio['last'] !== '' ? $fio['last'] : 'преподавателя')
+    . ' '
+    . $year
+    . '.docx';
 header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 header('Content-Disposition: attachment; filename="teacher-report.docx"; filename*=UTF-8\'\'' . rawurlencode($downloadName));
 header('Content-Length: ' . (string) strlen($binary));
