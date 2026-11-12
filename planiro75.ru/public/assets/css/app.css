@@ -2949,6 +2949,13 @@ a:hover {
   min-height: 220px;
   border: 1px solid #e6eaef;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.plan-col-list {
+  flex: 1;
+  min-height: 120px;
 }
 
 .plan-col-head {

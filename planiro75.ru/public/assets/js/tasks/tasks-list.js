@@ -765,7 +765,9 @@
     root.querySelectorAll('.task-card').forEach(function (btn) {
       btn.setAttribute('draggable', 'true');
       btn.addEventListener('dragstart', function (e) {
-        e.dataTransfer.setData('text/task-id', btn.getAttribute('data-id'));
+        var taskId = btn.getAttribute('data-id') || '';
+        e.dataTransfer.setData('text/plain', taskId);
+        e.dataTransfer.setData('text/task-id', taskId);
         e.dataTransfer.effectAllowed = 'move';
         btn.classList.add('task-card-dragging');
       });
@@ -819,13 +821,14 @@
         e.preventDefault();
         list.classList.add('kanban-list-hover');
       });
-      list.addEventListener('dragleave', function () {
+      list.addEventListener('dragleave', function (e) {
+        if (e.relatedTarget && list.contains(e.relatedTarget)) return;
         list.classList.remove('kanban-list-hover');
       });
       list.addEventListener('drop', function (e) {
         e.preventDefault();
         list.classList.remove('kanban-list-hover');
-        var tid = parseInt(e.dataTransfer.getData('text/task-id'), 10);
+        var tid = parseInt(e.dataTransfer.getData('text/task-id') || e.dataTransfer.getData('text/plain'), 10);
         var col = list.closest(cardSelector);
         var value = col ? col.getAttribute(attrName) : '';
         if (!tid || !value) return;
@@ -1742,7 +1745,7 @@
 
   function setupPlanDnD(root) {
     if (myPlanStagesFeature && myPlanStages.length) {
-      setupTaskDropLists(root, '.plan-col-list', '.plan-col', 'data-plan-stage-id', function (tid, newStageId) {
+      setupTaskDropLists(root, '.plan-col', '.plan-col', 'data-plan-stage-id', function (tid, newStageId) {
         var n = parseInt(newStageId, 10);
         if (!(n > 0)) return Promise.resolve();
         return api('/api/task.php?id=' + tid, { method: 'PATCH', body: { my_plan_stage_id: n } })
@@ -1752,7 +1755,7 @@
           });
       });
     } else {
-      setupTaskDropLists(root, '.plan-col-list', '.plan-col', 'data-plan-lane', function (tid, newLane) {
+      setupTaskDropLists(root, '.plan-col', '.plan-col', 'data-plan-lane', function (tid, newLane) {
         return api('/api/task.php?id=' + tid, { method: 'PATCH', body: { my_plan_lane: newLane } })
           .then(loadTasks)
           .catch(function (err) {

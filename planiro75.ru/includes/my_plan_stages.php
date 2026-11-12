@@ -147,6 +147,7 @@ function planner_my_plan_upsert_placement(int $orgId, int $userId, int $taskId, 
 
 function planner_my_plan_body_is_only_stage_move(array $body): bool
 {
+    unset($body['_csrf'], $body['csrf_token']);
     $keys = array_keys($body);
     sort($keys);
     return $keys === ['my_plan_stage_id'];
