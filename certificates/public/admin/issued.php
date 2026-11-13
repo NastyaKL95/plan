@@ -55,31 +55,17 @@ if (($_GET['export'] ?? '') === 'csv') {
     $filename = 'Реестр — ' . $tpl['title'] . '.csv';
     header('Content-Type: text/csv; charset=UTF-8');
     header("Content-Disposition: attachment; filename=\"registry.csv\"; filename*=UTF-8''" . rawurlencode($filename));
-    $out = fopen('php://output', 'wb');
-    fwrite($out, "\xEF\xBB\xBF");
-    $head = ['Номер'];
-    foreach ($tpl['inputs'] as $input) {
-        $head[] = $input['label'];
-    }
-    array_push($head, 'Дата выдачи', 'Код проверки', 'Ссылка', 'Скачиваний', 'Статус', 'Проверка');
-    fputcsv($out, $head, ';');
+    echo "\xEF\xBB\xBF", cert_csv_line(cert_registry_head($tpl));
     while ($row = $st->fetch()) {
-        $values = json_decode((string) $row['values_json'], true) ?: [];
-        $line = [$row['number']];
-        foreach ($tpl['inputs'] as $input) {
-            $line[] = (string) ($values[$input['key']] ?? '');
-        }
-        array_push(
-            $line,
-            date('d.m.Y', strtotime((string) $row['issued_on'])),
-            $row['code'],
-            $row['link_id'] ? ((string) $row['link_note'] ?: 'ссылка #' . $row['link_id']) : 'вручную',
-            (int) $row['downloads'],
-            $row['revoked_at'] ? 'аннулирован ' . format_dt($row['revoked_at']) : 'действителен',
-            absolute_url('verify.php?code=' . $row['code'])
-        );
-        fputcsv($out, $line, ';');
+        echo cert_csv_line(cert_registry_line($tpl, $row));
     }
+    exit;
+}
+
+if (($_GET['export'] ?? '') === 'zip') {
+    $st = db()->prepare("SELECT i.*, l.note AS link_note FROM cert_issued i LEFT JOIN cert_links l ON l.id = i.link_id WHERE $where AND i.revoked_at IS NULL ORDER BY i.id");
+    $st->execute($params);
+    cert_stream_zip($tpl, $st, 'Сертификаты — ' . $tpl['title']);
     exit;
 }
 
@@ -107,6 +93,7 @@ template_tabs($tpl, 'issued');
     <input type="search" name="q" value="<?= h($q) ?>" placeholder="ФИО, организация, номер или код" style="flex:1;min-width:220px">
     <button class="btn">Найти</button>
     <a class="btn" href="<?= h(url($selfQuery . '&export=csv')) ?>">Скачать CSV</a>
+    <a class="btn" href="<?= h(url($selfQuery . '&export=zip')) ?>" title="PDF всех действующих сертификатов из списка ниже">Архив PDF</a>
   </form>
   <p class="muted small">
     <?= $total ?> <?= plural_ru($total, 'сертификат', 'сертификата', 'сертификатов') ?>
@@ -122,7 +109,7 @@ template_tabs($tpl, 'issued');
       <tr<?= $row['revoked_at'] ? ' style="opacity:.55"' : '' ?>>
         <td><b><?= h($row['number']) ?></b><?php if ($row['revoked_at']): ?><br><span class="badge badge--off">аннулирован</span><?php endif; ?></td>
         <?php foreach ($tpl['inputs'] as $input): ?><td><?= h($values[$input['key']] ?? '') ?></td><?php endforeach; ?>
-        <td class="small"><?= h(format_dt($row['created_at'])) ?><br><span class="muted"><?= $row['link_id'] ? h($row['link_note'] ?: 'по ссылке') : 'вручную' ?></span></td>
+        <td class="small"><?= h(format_dt($row['created_at'])) ?><br><span class="muted"><?= $row['link_id'] ? h($row['link_note'] ?: 'по ссылке') : 'список или вручную' ?></span></td>
         <td class="mono small"><a href="<?= h(url('verify.php?code=' . $row['code'])) ?>" target="_blank" rel="noopener"><?= h($row['code']) ?></a></td>
         <td><?= (int) $row['downloads'] ?></td>
         <td>

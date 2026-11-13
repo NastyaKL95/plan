@@ -287,11 +287,16 @@ function cert_render_pdf(array $template, array $map): string
 {
     [$w, $h] = cert_page_size($template);
     $pdf = new CertPdf($w, $h);
+    static $bgCache = [];
     $bg = cert_background_path($template);
     if ($bg !== null) {
-        $info = getimagesize($bg);
-        if ($info !== false && ($info[2] ?? 0) === IMAGETYPE_JPEG) {
-            $pdf->setBackground((string) file_get_contents($bg), (int) $info[0], (int) $info[1], (int) ($info['channels'] ?? 3));
+        if (!isset($bgCache[$bg])) {
+            $info = getimagesize($bg);
+            $bgCache = [$bg => $info !== false && ($info[2] ?? 0) === IMAGETYPE_JPEG
+                ? [(string) file_get_contents($bg), (int) $info[0], (int) $info[1], (int) ($info['channels'] ?? 3)] : null];
+        }
+        if ($bgCache[$bg] !== null) {
+            $pdf->setBackground(...$bgCache[$bg]);
         }
     }
     foreach (array_keys(cert_fonts()) as $key) {
@@ -492,6 +497,93 @@ function cert_issued_pdf(array $tpl, array $issued): string
         'code' => $issued['code'],
         'issued_on' => $issued['issued_on'],
     ]));
+}
+
+/** @return list<string> */
+function cert_registry_head(array $tpl): array
+{
+    $head = ['Номер'];
+    foreach ($tpl['inputs'] as $input) {
+        $head[] = $input['label'];
+    }
+    array_push($head, 'Дата выдачи', 'Код проверки', 'Ссылка', 'Скачиваний', 'Статус', 'Проверка');
+
+    return $head;
+}
+
+/** @param array $row строка cert_issued с полем link_note */
+function cert_registry_line(array $tpl, array $row): array
+{
+    $values = json_decode((string) $row['values_json'], true) ?: [];
+    $line = [$row['number']];
+    foreach ($tpl['inputs'] as $input) {
+        $line[] = (string) ($values[$input['key']] ?? '');
+    }
+    array_push(
+        $line,
+        date('d.m.Y', strtotime((string) $row['issued_on'])),
+        $row['code'],
+        $row['link_id'] ? ((string) ($row['link_note'] ?? '') ?: 'ссылка #' . $row['link_id']) : 'список или вручную',
+        (int) $row['downloads'],
+        $row['revoked_at'] ? 'аннулирован ' . format_dt($row['revoked_at']) : 'действителен',
+        absolute_url('verify.php?code=' . $row['code'])
+    );
+
+    return $line;
+}
+
+function cert_csv_line(array $cells): string
+{
+    $fh = fopen('php://temp', 'w+b');
+    fputcsv($fh, $cells, ';', '"', '');
+    rewind($fh);
+    $line = (string) stream_get_contents($fh);
+    fclose($fh);
+
+    return $line;
+}
+
+function cert_safe_filename(string $name): string
+{
+    $name = trim(preg_replace('/[\\\\\/:*?"<>|\x00-\x1F]+/u', ' ', $name) ?? '');
+    $name = preg_replace('/\s+/u', ' ', $name) ?? '';
+
+    return mb_substr($name, 0, 120) ?: 'certificate';
+}
+
+/**
+ * Отдаёт ZIP с PDF всех переданных сертификатов и реестром в CSV. Аннулированные пропускаются.
+ *
+ * @param iterable<array> $rows строки cert_issued (с link_note)
+ */
+function cert_stream_zip(array $tpl, iterable $rows, string $archiveName): void
+{
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
+    @set_time_limit(0);
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    $archiveName = cert_safe_filename($archiveName) . '.zip';
+    header('Content-Type: application/zip');
+    header("Content-Disposition: attachment; filename=\"certificates.zip\"; filename*=UTF-8''" . rawurlencode($archiveName));
+    header('Cache-Control: private, no-store');
+    header('X-Accel-Buffering: no');
+
+    $zip = new ZipStreamWriter();
+    $csv = "\xEF\xBB\xBF" . cert_csv_line(cert_registry_head($tpl));
+    foreach ($rows as $row) {
+        if (!empty($row['revoked_at'])) {
+            continue;
+        }
+        $row['values'] = json_decode((string) $row['values_json'], true) ?: [];
+        $name = cert_holder_name($tpl, $row['values']);
+        $zip->add(cert_safe_filename($row['number'] . ($name !== '' ? ' — ' . $name : '')) . '.pdf', cert_issued_pdf($tpl, $row), false);
+        $csv .= cert_csv_line(cert_registry_line($tpl, $row));
+    }
+    $zip->add('Реестр.csv', $csv);
+    $zip->finish();
 }
 
 /** Первое заполненное поле — обычно ФИО. */

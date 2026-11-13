@@ -43,6 +43,7 @@ function template_tabs(array $tpl, string $active): void
     $tabs = [
         'design' => ['admin/template.php?id=' . $tpl['id'], 'Макет'],
         'links' => ['admin/links.php?template=' . $tpl['id'], 'Ссылки для слушателей'],
+        'bulk' => ['admin/bulk.php?template=' . $tpl['id'], 'Выдать по списку'],
         'issued' => ['admin/issued.php?template=' . $tpl['id'], 'Реестр выданных'],
     ];
     echo '<div class="page-head"><div><a class="small" href="' . h(url('admin/index.php')) . '">← Все шаблоны</a>'
