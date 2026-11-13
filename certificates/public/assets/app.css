@@ -419,6 +419,16 @@ input[type="color"] {
 .kv { display: grid; grid-template-columns: 160px 1fr; gap: 8px 16px; text-align: left; margin: 20px 0; }
 .kv dt { color: var(--muted); }
 .kv dd { margin: 0; font-weight: 600; }
+.kv > div { display: contents; }
+.kv > div > span { color: var(--muted); }
+.kv > div > b { font-weight: 600; word-break: break-word; }
+
+.stats { display: flex; flex-wrap: wrap; gap: 12px; margin: 4px 0 16px; }
+.stat { min-width: 150px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 10px; background: #f8fafc; }
+.stat b { display: block; font-size: 26px; line-height: 1.2; }
+.stat span { color: var(--muted); font-size: 13px; }
+.stat--ok b { color: #1b7f3b; }
+.stat--warn b { color: #b45309; }
 
 .footer-note { text-align: center; color: var(--muted); font-size: 13px; margin-top: 16px; }
 
