@@ -392,7 +392,14 @@ window.__PLANNER_USER_DEPT_ID__=<?= json_encode(isset($user['department_id']) &&
           <li class="task-modal-meta-row">
             <span class="task-modal-meta-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></span>
             <span class="task-modal-meta-key">Статус</span>
-            <select id="fStatus" class="task-modal-meta-select" aria-label="Статус">
+            <div class="task-status-seg" id="taskStatusSeg" role="radiogroup" aria-label="Статус">
+              <button type="button" class="task-status-btn" data-status="new" role="radio">Новая</button>
+              <button type="button" class="task-status-btn" data-status="in_progress" role="radio">В работе</button>
+              <button type="button" class="task-status-btn" data-status="review" role="radio">На проверке</button>
+              <button type="button" class="task-status-btn" data-status="done" role="radio">Выполнена</button>
+              <button type="button" class="task-status-btn" data-status="cancelled" role="radio">Отменена</button>
+            </div>
+            <select id="fStatus" class="task-modal-meta-select task-status-native" aria-label="Статус" data-bx-dropdown-skip="1" hidden>
               <option value="new">Новая</option>
               <option value="in_progress">В работе</option>
               <option value="review">На проверке</option>

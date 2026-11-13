@@ -4004,6 +4004,85 @@ a:hover {
   }
 }
 
+.task-modal-left .task-modal-title-input {
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  padding: 8px 12px;
+}
+
+.task-status-native {
+  display: none;
+}
+
+.task-status-seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.task-status-btn {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.task-status-btn:hover:not(:disabled) {
+  border-color: rgba(25, 118, 210, 0.45);
+  color: #1976d2;
+}
+
+.task-status-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.task-status-btn.is-active,
+.task-status-btn.is-active:disabled {
+  opacity: 1;
+  font-weight: 600;
+}
+
+.task-status-btn.is-active[data-status="new"] {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #1e293b;
+}
+
+.task-status-btn.is-active[data-status="in_progress"] {
+  background: #dbeafe;
+  border-color: #60a5fa;
+  color: #1d4ed8;
+}
+
+.task-status-btn.is-active[data-status="review"] {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+.task-status-btn.is-active[data-status="done"] {
+  background: #dcfce7;
+  border-color: #22c55e;
+  color: #166534;
+}
+
+.task-status-btn.is-active[data-status="cancelled"] {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #64748b;
+  text-decoration: line-through;
+}
+
 .task-modal-left > .task-modal-footer {
   position: sticky;
   bottom: calc(-1 * var(--tm-pad-bottom, 20px));

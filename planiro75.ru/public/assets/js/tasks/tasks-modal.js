@@ -105,6 +105,7 @@
       });
       setTaskProjectFieldReadOnly(task || { author_id: currentUserId() });
       if (typeof window.bxCustomSelectSyncAll === 'function') window.bxCustomSelectSyncAll();
+      syncStatusButtons();
       return;
     }
     ;['fTitle', 'fDesc', 'fAssignee', 'fDue', 'fStatus', 'fAssistants', 'fObservers', 'fRemind', 'fRecurrence', 'fTransitionNote', 'fWorkEdu', 'fWorkEduMethod', 'fWorkResearch', 'fWorkOrgMethod', 'fWorkStart', 'fWorkIndicator', 'fWorkHours'].forEach(function (id) {
@@ -153,6 +154,7 @@
       if (typeof window.bxCustomSelectSync === 'function' && fp) window.bxCustomSelectSync(fp);
     }
     if (typeof window.bxCustomSelectSyncAll === 'function') window.bxCustomSelectSyncAll();
+    syncStatusButtons();
   }
 
   function applyTaskModalReadonlyDecorators() {
@@ -408,6 +410,66 @@
     body.work_indicator = workText('fWorkIndicator');
     body.work_hours = workHours('fWorkHours');
     return body;
+  }
+
+  var STATUS_TRANSITIONS = {
+    new: ['in_progress', 'cancelled'],
+    in_progress: ['new', 'review', 'done', 'cancelled'],
+    review: ['in_progress', 'done', 'cancelled'],
+    done: ['in_progress', 'cancelled'],
+    cancelled: ['new', 'in_progress'],
+  };
+  var STATUS_LABELS = {
+    new: 'Новая',
+    in_progress: 'В работе',
+    review: 'На проверке',
+    done: 'Выполнена',
+    cancelled: 'Отменена',
+  };
+
+  function syncStatusButtons() {
+    var sel = $('fStatus');
+    var seg = $('taskStatusSeg');
+    if (!sel || !seg) return;
+    var md = $('taskSplitModal');
+    var isCreate = md && md.getAttribute('data-task-mode') === 'create';
+    var from = drawerInitialStatus || '';
+    var allowed = !isCreate && from && STATUS_TRANSITIONS[from] ? STATUS_TRANSITIONS[from] : null;
+    seg.querySelectorAll('.task-status-btn').forEach(function (btn) {
+      var st = btn.getAttribute('data-status');
+      var active = st === sel.value;
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-checked', active ? 'true' : 'false');
+      var reachable = !allowed || st === from || allowed.indexOf(st) >= 0;
+      btn.disabled = sel.disabled || !reachable;
+      btn.title = reachable ? '' : 'Из статуса «' + (STATUS_LABELS[from] || from) + '» сюда перейти нельзя';
+    });
+  }
+
+  function pickStatus(st) {
+    var sel = $('fStatus');
+    if (!sel || sel.disabled) return;
+    sel.value = st;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    syncStatusButtons();
+    var md = $('taskSplitModal');
+    var isEdit = md && md.getAttribute('data-task-mode') === 'edit';
+    var note = $('fTransitionNote');
+    if (isEdit && st === 'review' && drawerInitialStatus !== 'review' && note && !note.value.trim()) {
+      var sec = $('modalSectionMore');
+      var pill = document.querySelector('.task-modal-pill[data-target="modalSectionMore"]');
+      if (sec && sec.hidden && pill) pill.click();
+      note.focus();
+      notify('Для перевода на проверку добавьте примечание.', 'info');
+    }
+  }
+
+  if ($('taskStatusSeg')) {
+    $('taskStatusSeg').addEventListener('click', function (ev) {
+      var btn = ev.target.closest('.task-status-btn');
+      if (!btn || btn.disabled) return;
+      pickStatus(btn.getAttribute('data-status'));
+    });
   }
 
   var WORK_KINDS = [
@@ -719,6 +781,7 @@
     }
 
     $('fStatus').value = st;
+    syncStatusButtons();
     $('fDue').value = dueVal;
     if ($('fVisibleDepartment')) $('fVisibleDepartment').checked = false;
     if ($('fVisibleInstitute')) $('fVisibleInstitute').checked = false;
@@ -959,6 +1022,7 @@
         $('fTitle').value = t.title;
         $('fDesc').value = t.description || '';
         $('fStatus').value = t.status;
+        syncStatusButtons();
         setPriorityUi(t.priority || 'normal');
         ensureTaskProjectOptionFromApi(t);
         $('fProject').value = t.project_id || '';
