@@ -420,8 +420,14 @@ window.__PLANNER_USER_DEPT_ID__=<?= json_encode(isset($user['department_id']) &&
           </li>
           <li class="task-modal-meta-row task-work-row">
             <span class="task-modal-meta-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span>
-            <span class="task-modal-meta-key">Вид работы</span>
+            <span class="task-modal-meta-key">План/отчёт</span>
             <div class="task-modal-meta-val task-work-kinds">
+              <button type="button" class="task-work-summary" id="btnWorkToggle" aria-expanded="false" aria-controls="taskWorkBody">
+                <span class="task-work-summary-text" id="taskWorkSummary">Не входит в план/отчёт</span>
+                <span class="task-work-summary-action">Настроить</span>
+              </button>
+              <div class="task-work-body" id="taskWorkBody" hidden>
+              <p class="task-work-hint task-work-items-note" id="taskWorkItemsNote" hidden></p>
               <label><input type="checkbox" id="fWorkEdu"> Учебная работа</label>
               <label><input type="checkbox" id="fWorkEduMethod"> Учебно-методическая работа</label>
               <label><input type="checkbox" id="fWorkResearch"> Научно-исследовательская работа</label>
@@ -439,6 +445,7 @@ window.__PLANNER_USER_DEPT_ID__=<?= json_encode(isset($user['department_id']) &&
               <label class="task-work-field" for="fWorkIndicator">Показатель выполнения
                 <input type="text" class="task-modal-meta-input" id="fWorkIndicator" maxlength="255" placeholder="кол-во чел., п. л., стр." autocomplete="off">
               </label>
+              </div>
             </div>
           </li>
         </ul>
@@ -541,7 +548,12 @@ window.__PLANNER_USER_DEPT_ID__=<?= json_encode(isset($user['department_id']) &&
         </div>
 
         <div id="modalSectionSubtasks" class="task-modal-extra task-modal-edit-only" hidden>
-          <h3 class="subtasks-head">Чек-листы</h3>
+          <div class="subtasks-head-row">
+            <h3 class="subtasks-head">Чек-лист</h3>
+            <span class="checklist-work-total" id="checklistWorkTotal" hidden></span>
+            <button type="button" class="checklist-template-toggle" id="btnChecklistTemplateToggle" aria-expanded="false" aria-controls="checklistTemplatePanel">Из шаблона</button>
+          </div>
+          <div class="checklist-template-panel" id="checklistTemplatePanel" hidden>
           <div class="subtask-template-row">
             <select id="checklistTemplate" class="input-inline"><option value="">Шаблон чек-листа…</option></select>
             <select id="checklistTemplateMode" class="input-inline" aria-label="Режим вставки шаблона">
@@ -561,6 +573,7 @@ window.__PLANNER_USER_DEPT_ID__=<?= json_encode(isset($user['department_id']) &&
             </div>
           </div>
           <p class="muted checklist-template-preview" id="checklistTemplatePreview">Выберите шаблон для предпросмотра.</p>
+          </div>
           <div class="checklist-template-dialog" id="checklistTemplateDialog" hidden role="dialog" aria-modal="false" aria-labelledby="checklistTemplateDialogTitle" tabindex="-1">
             <div class="checklist-template-dialog__title" id="checklistTemplateDialogTitle">Шаблон чек-листа</div>
             <p class="checklist-template-dialog__text" id="checklistTemplateDialogText"></p>
@@ -575,6 +588,7 @@ window.__PLANNER_USER_DEPT_ID__=<?= json_encode(isset($user['department_id']) &&
             <button type="button" class="btn btn-secondary" id="btnAddSubtask">Добавить</button>
           </div>
           <ul class="subtask-list" id="subtaskList"></ul>
+          <p class="task-work-hint checklist-work-hint">Кнопка «ч» у пункта — вид работы и часы. Если они заданы хотя бы у одного пункта, в план попадают пункты вместо задачи, а в отчёт — отмеченные выполненными.</p>
         </div>
 
         <div class="task-modal-footer task-modal-footer-create">

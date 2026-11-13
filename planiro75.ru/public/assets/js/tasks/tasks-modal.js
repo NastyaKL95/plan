@@ -188,7 +188,12 @@
       sul.querySelectorAll('.subtask-assist-cb').forEach(function (cb) {
         cb.disabled = !ok;
       });
+      sul.querySelectorAll('.subtask-work-panel select, .subtask-work-panel input').forEach(function (el) {
+        el.disabled = !ok;
+      });
     }
+    var stt = $('btnChecklistTemplateToggle');
+    if (stt) stt.hidden = !ok;
   }
   function renderTagsPicker(selectedIds) {
     renderTagsPickerFor($('fTags'), selectedIds);
@@ -405,8 +410,240 @@
     return body;
   }
 
+  var WORK_KINDS = [
+    { key: 'work_edu', field: 'fWorkEdu', label: 'Учебная работа', short: 'УР' },
+    { key: 'work_edu_method', field: 'fWorkEduMethod', label: 'Учебно-методическая работа', short: 'УМР' },
+    { key: 'work_research', field: 'fWorkResearch', label: 'Научно-исследовательская работа', short: 'НИР' },
+    { key: 'work_org_method', field: 'fWorkOrgMethod', label: 'Организационно-методическая работа', short: 'ОМР' },
+  ];
+  var currentSubtaskItems = [];
+
+  function workKindMeta(key) {
+    for (var i = 0; i < WORK_KINDS.length; i++) {
+      if (WORK_KINDS[i].key === key) return WORK_KINDS[i];
+    }
+    return null;
+  }
+
+  function subtaskWorkHours(s) {
+    var n = parseFloat(s && s.work_hours != null ? String(s.work_hours).replace(',', '.') : '');
+    return isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
+  }
+
+  function subtaskCountsInReport(s) {
+    return !!(s && workKindMeta(s.work_kind) && subtaskWorkHours(s) != null);
+  }
+
+  function checklistWorkSum() {
+    var sum = 0;
+    var count = 0;
+    currentSubtaskItems.forEach(function (s) {
+      if (!subtaskCountsInReport(s)) return;
+      sum += subtaskWorkHours(s);
+      count += 1;
+    });
+    return { sum: Math.round(sum * 100) / 100, count: count };
+  }
+
+  function refreshWorkSummary() {
+    var el = $('taskWorkSummary');
+    if (!el) return;
+    var items = checklistWorkSum();
+    var text;
+    if (items.count) {
+      var kinds = {};
+      currentSubtaskItems.forEach(function (s) {
+        if (subtaskCountsInReport(s)) kinds[s.work_kind] = true;
+      });
+      var shorts = WORK_KINDS.filter(function (k) {
+        return kinds[k.key];
+      }).map(function (k) {
+        return k.short;
+      });
+      text = 'По чек-листу: ' + shorts.join(', ') + ' · ' + workHoursText(items.sum) + ' ч';
+    } else {
+      var picked = WORK_KINDS.filter(function (k) {
+        return workFlag(k.field);
+      });
+      if (!picked.length) {
+        text = 'Не входит в план/отчёт';
+      } else {
+        text = picked.length === 1
+          ? picked[0].label
+          : picked.map(function (k) {
+              return k.short;
+            }).join(', ');
+        var hours = workHours('fWorkHours');
+        if (hours != null) text += ' · ' + workHoursText(hours) + ' ч';
+      }
+    }
+    el.textContent = text;
+    var btn = $('btnWorkToggle');
+    if (btn) btn.classList.toggle('is-empty', text === 'Не входит в план/отчёт');
+  }
+
+  function setWorkBodyOpen(open) {
+    var body = $('taskWorkBody');
+    var btn = $('btnWorkToggle');
+    if (body) body.hidden = !open;
+    if (btn) {
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      var act = btn.querySelector('.task-work-summary-action');
+      if (act) act.textContent = open ? 'Свернуть' : 'Настроить';
+    }
+  }
+
+  function applyChecklistWorkState() {
+    var items = checklistWorkSum();
+    var hoursEl = $('fWorkHours');
+    var note = $('taskWorkItemsNote');
+    var total = $('checklistWorkTotal');
+    if (hoursEl) {
+      hoursEl.readOnly = items.count > 0;
+      hoursEl.classList.toggle('is-derived', items.count > 0);
+      if (items.count > 0) hoursEl.value = workHoursText(items.sum);
+    }
+    if (note) {
+      note.hidden = items.count === 0;
+      note.textContent = items.count
+        ? 'Вид работы и часы заданы у пунктов чек-листа (' + items.count + ', всего ' + workHoursText(items.sum) +
+          ' ч). В план/отчёт идут они, отметки ниже используются, только если убрать часы у пунктов.'
+        : '';
+    }
+    if (total) {
+      total.hidden = items.count === 0;
+      total.textContent = items.count ? 'В план/отчёт: ' + workHoursText(items.sum) + ' ч' : '';
+    }
+    refreshWorkSpanPreview();
+    refreshWorkSummary();
+  }
+
+  function defaultSubtaskWorkKind() {
+    var picked = WORK_KINDS.filter(function (k) {
+      return workFlag(k.field);
+    });
+    return picked.length ? picked[0].key : '';
+  }
+
+  function subtaskWorkBadgeHtml(s) {
+    var meta = workKindMeta(s.work_kind);
+    var hours = subtaskWorkHours(s);
+    var cls = 'subtask-work-btn';
+    var text = 'ч';
+    var title = 'Вид работы и часы для плана/отчёта';
+    if (meta && hours != null) {
+      cls += ' is-set';
+      text = workHoursText(hours) + ' ч · ' + meta.short;
+      title = meta.label + ', ' + workHoursText(hours) + ' ч — идёт в план/отчёт';
+    } else if (meta || hours != null) {
+      cls += ' is-incomplete';
+      text = meta ? meta.short : workHoursText(hours) + ' ч';
+      title = 'Укажите и вид работы, и часы, чтобы пункт попал в план/отчёт';
+    }
+    return (
+      '<button type="button" class="' + cls + '" title="' + escapeHtml(title) + '" aria-label="' +
+      escapeHtml(title) + '" aria-expanded="false">' + escapeHtml(text) + '</button>'
+    );
+  }
+
+  function subtaskWorkPanelHtml(s) {
+    var kind = s.work_kind || '';
+    var opts = '<option value="">Не входит в план/отчёт</option>' + WORK_KINDS.map(function (k) {
+      return '<option value="' + k.key + '"' + (k.key === kind ? ' selected' : '') + '>' + escapeHtml(k.label) + '</option>';
+    }).join('');
+    var hours = subtaskWorkHours(s);
+    var dateVal = function (v) {
+      return v ? escapeHtml(String(v).slice(0, 10)) : '';
+    };
+    return (
+      '<div class="subtask-work-panel" hidden>' +
+      '<label class="subtask-work-field subtask-work-field--kind">Вид работы<select class="sw-kind">' + opts + '</select></label>' +
+      '<label class="subtask-work-field subtask-work-field--hours">Часы<input type="text" class="sw-hours" inputmode="decimal" maxlength="12" placeholder="0" autocomplete="off" value="' +
+      (hours != null ? escapeHtml(workHoursText(hours)) : '') + '"></label>' +
+      '<label class="subtask-work-field">Начало<input type="date" class="sw-start" value="' + dateVal(s.work_start) + '"></label>' +
+      '<label class="subtask-work-field">Окончание<input type="date" class="sw-end" value="' + dateVal(s.work_end) + '"></label>' +
+      '<label class="subtask-work-field subtask-work-field--wide">Показатель выполнения<input type="text" class="sw-indicator" maxlength="255" placeholder="кол-во чел., п. л., стр." autocomplete="off" value="' +
+      escapeHtml(s.work_indicator || '') + '"></label>' +
+      '<p class="subtask-work-note">Даты можно не заполнять — тогда берутся дата начала и крайний срок задачи.</p>' +
+      '</div>'
+    );
+  }
+
+  function readSubtaskWorkPanel(panel) {
+    var hoursRaw = (panel.querySelector('.sw-hours').value || '').trim().replace(',', '.');
+    var hours = hoursRaw === '' ? null : parseFloat(hoursRaw);
+    return {
+      work_kind: panel.querySelector('.sw-kind').value || null,
+      work_hours: hours != null && isFinite(hours) && hours >= 0 ? Math.round(hours * 100) / 100 : null,
+      work_start: panel.querySelector('.sw-start').value || null,
+      work_end: panel.querySelector('.sw-end').value || null,
+      work_indicator: (panel.querySelector('.sw-indicator').value || '').trim(),
+    };
+  }
+
+  function bindSubtaskWork(ul) {
+    ul.querySelectorAll('.subtask-item').forEach(function (li) {
+      var btn = li.querySelector('.subtask-work-btn');
+      var panel = li.querySelector('.subtask-work-panel');
+      if (!btn || !panel) return;
+      var sid = parseInt(li.getAttribute('data-id'), 10);
+      btn.addEventListener('click', function () {
+        var open = panel.hidden;
+        panel.hidden = !open;
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        li.classList.toggle('is-work-open', open);
+        li.setAttribute('draggable', open ? 'false' : 'true');
+        var kindSel = panel.querySelector('.sw-kind');
+        if (open && kindSel && !kindSel.value) {
+          var def = defaultSubtaskWorkKind();
+          if (def) kindSel.value = def;
+        }
+        if (open) {
+          var h = panel.querySelector('.sw-hours');
+          if (h) h.focus();
+        }
+      });
+      var save = function () {
+        var body = readSubtaskWorkPanel(panel);
+        api('/api/subtask.php?id=' + sid, { method: 'PATCH', body: body })
+          .then(function () {
+            currentSubtaskItems.forEach(function (s) {
+              if (parseInt(s.id, 10) !== sid) return;
+              s.work_kind = body.work_kind;
+              s.work_hours = body.work_hours;
+              s.work_start = body.work_start;
+              s.work_end = body.work_end;
+              s.work_indicator = body.work_indicator;
+              var tmp = document.createElement('div');
+              tmp.innerHTML = subtaskWorkBadgeHtml(s);
+              var fresh = tmp.firstChild;
+              btn.className = fresh.className;
+              btn.title = fresh.title;
+              btn.setAttribute('aria-label', fresh.getAttribute('aria-label'));
+              btn.textContent = fresh.textContent;
+            });
+            applyChecklistWorkState();
+          })
+          .catch(function (e) {
+            notify('Не удалось сохранить часы пункта: ' + (e.message || ''), 'error');
+          });
+      };
+      panel.querySelectorAll('select, input').forEach(function (el) {
+        el.addEventListener('change', save);
+        if (el.tagName === 'INPUT' && el.type === 'text') {
+          el.addEventListener('keydown', function (ev) {
+            if (ev.key !== 'Enter') return;
+            ev.preventDefault();
+            el.blur();
+          });
+        }
+      });
+    });
+  }
+
   function fillWorkReport(t) {
     t = t || {};
+    currentSubtaskItems = [];
     function setCb(id, value) {
       var el = $(id);
       if (!el) return;
@@ -440,7 +677,8 @@
       if (sum > 0) hours = sum;
     }
     setVal('fWorkHours', hours != null && hours !== '' ? hours : '', true);
-    refreshWorkSpanPreview();
+    setWorkBodyOpen(false);
+    applyChecklistWorkState();
   }
 
   function openCreateTaskModal(opts) {
@@ -976,6 +1214,8 @@
   function renderSubtasks(items) {
     var ul = $('subtaskList');
     if (!ul) return;
+    currentSubtaskItems = (items || []).slice();
+    applyChecklistWorkState();
     if (!items || !items.length) {
       ul.innerHTML =
         '<li class="subtask-empty-state">Чек-лист пока пуст. Добавьте первый пункт вручную или вставьте его из шаблона.</li>';
@@ -1034,7 +1274,9 @@
           (s.is_done == 1 || s.is_done === true ? 'checked' : '') +
           '><span class="subtask-title">' +
           escapeHtml(s.title) +
-          '</span></label><div class="subtask-assistants-wrap' +
+          '</span></label>' +
+          subtaskWorkBadgeHtml(s) +
+          '<div class="subtask-assistants-wrap' +
           (selectedIds.length ? ' has-assignees' : '') +
           '"><button type="button" class="subtask-assistants-trigger" title="' +
           escapeHtml(summary) +
@@ -1046,12 +1288,14 @@
           assistantsOpts +
           '</select><div class="subtask-assistants-popover">' +
           assistantsChecks +
-          '</div></div><button type="button" class="link-btn sub-del" aria-label="Удалить">×</button></li>'
+          '</div></div><button type="button" class="link-btn sub-del" aria-label="Удалить">×</button>' +
+          subtaskWorkPanelHtml(s) +
+          '</li>'
         );
       })
       .join('');
 
-    ul.querySelectorAll('input[type=checkbox]').forEach(function (cb) {
+    ul.querySelectorAll('.subtask-check input[type=checkbox]').forEach(function (cb) {
       cb.addEventListener('change', function () {
         var li = cb.closest('.subtask-item');
         var sid = li.getAttribute('data-id');
@@ -1121,6 +1365,7 @@
       });
     });
     setupSubtaskDnD(ul);
+    bindSubtaskWork(ul);
     updateChecklistTemplatePreview();
   }
 
@@ -1568,4 +1813,35 @@
     el.addEventListener('input', refreshWorkSpanPreview);
     el.addEventListener('change', refreshWorkSpanPreview);
   });
+
+  ['fWorkEdu', 'fWorkEduMethod', 'fWorkResearch', 'fWorkOrgMethod', 'fWorkHours'].forEach(function (id) {
+    var el = $(id);
+    if (!el) return;
+    el.addEventListener('input', refreshWorkSummary);
+    el.addEventListener('change', refreshWorkSummary);
+  });
+
+  if ($('btnWorkToggle')) {
+    $('btnWorkToggle').addEventListener('click', function () {
+      setWorkBodyOpen($('taskWorkBody') ? $('taskWorkBody').hidden : false);
+    });
+  }
+
+  if ($('btnChecklistTemplateToggle')) {
+    $('btnChecklistTemplateToggle').addEventListener('click', function () {
+      var panel = $('checklistTemplatePanel');
+      if (!panel) return;
+      panel.hidden = !panel.hidden;
+      this.setAttribute('aria-expanded', panel.hidden ? 'false' : 'true');
+      this.classList.toggle('is-active', !panel.hidden);
+    });
+  }
+
+  if ($('newSubtaskTitle')) {
+    $('newSubtaskTitle').addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' || ev.isComposing) return;
+      ev.preventDefault();
+      addSubtask();
+    });
+  }
 

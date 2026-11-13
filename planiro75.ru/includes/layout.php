@@ -35,7 +35,7 @@ function layout_start(array $user, string $title, string $active = 'dashboard'):
   <title><?= $t ?> — <?= $app ?></title>
   <?= planner_favicon_head_markup() ?>
   <script>window.__PLANNER_ROOT__=<?= $rootJson ?>;window.__PLANNER_USER_ID__=<?= $userIdJson ?>;window.__PLANNER_CSRF__=<?= json_encode(planner_csrf_token(), JSON_THROW_ON_ERROR | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
-  <link rel="stylesheet" href="<?= htmlspecialchars(planner_url('/assets/css/app.css'), ENT_QUOTES, 'UTF-8') ?>">
+  <link rel="stylesheet" href="<?= htmlspecialchars(planner_url('/assets/css/app.css') . '?v=' . (string) (@filemtime(dirname(__DIR__) . '/public/assets/css/app.css') ?: 1), ENT_QUOTES, 'UTF-8') ?>">
   <script src="<?= htmlspecialchars(planner_url('/assets/js/core.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
   <script src="<?= htmlspecialchars(planner_url('/assets/js/file_fields.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
   <script src="<?= htmlspecialchars(planner_url('/assets/js/bx-custom-select.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
