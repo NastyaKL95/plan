@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/task_extras.php';
+
 /**
  * Индивидуальный план/отчёт преподавателя: виды работы в задаче и выгрузка Word.
  */
@@ -43,6 +45,13 @@ function planner_teacher_report_ensure_schema(): bool
             'plan_hours_research' => 'DECIMAL(8,2) NULL',
             'plan_hours_org_method' => 'DECIMAL(8,2) NULL',
         ],
+        'subtasks' => [
+            'work_kind' => 'VARCHAR(32) NULL',
+            'work_hours' => 'DECIMAL(8,2) NULL',
+            'work_indicator' => 'VARCHAR(255) NULL',
+            'work_start' => 'DATE NULL',
+            'work_end' => 'DATE NULL',
+        ],
     ];
     try {
         $names = [];
@@ -56,7 +65,7 @@ function planner_teacher_report_ensure_schema(): bool
             "SELECT TABLE_NAME, COLUMN_NAME
              FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE()
-               AND TABLE_NAME IN ('tasks', 'users')
+               AND TABLE_NAME IN ('tasks', 'users', 'subtasks')
                AND COLUMN_NAME IN ($ph)"
         );
         $st->execute($names);
@@ -345,6 +354,106 @@ function planner_task_work_report_sync(int $taskId, int $orgId, bool $hoursTouch
     )->execute($params);
 }
 
+function planner_subtask_work_ready(): bool
+{
+    return planner_table_has_column('subtasks', 'work_kind')
+        && planner_table_has_column('subtasks', 'work_hours')
+        && planner_table_has_column('subtasks', 'work_end');
+}
+
+function planner_subtask_work_select_sql(string $alias = ''): string
+{
+    if (!planner_subtask_work_ready()) {
+        return '';
+    }
+    $p = $alias !== '' ? $alias . '.' : '';
+
+    return ', ' . $p . 'work_kind, ' . $p . 'work_hours, ' . $p . 'work_indicator, ' . $p . 'work_start, ' . $p . 'work_end';
+}
+
+/**
+ * Поля вида работы пункта чек-листа из тела PATCH.
+ *
+ * @param array<int, string> $parts
+ * @param array<int, mixed> $params
+ */
+function planner_subtask_work_append_fields(array $body, array &$parts, array &$params): bool
+{
+    if (!planner_subtask_work_ready()) {
+        return false;
+    }
+    $touched = false;
+    if (array_key_exists('work_kind', $body)) {
+        $kind = (string) ($body['work_kind'] ?? '');
+        $parts[] = 'work_kind = ?';
+        $params[] = isset(planner_teacher_report_kinds()[$kind]) ? $kind : null;
+        $touched = true;
+    }
+    if (array_key_exists('work_hours', $body)) {
+        $parts[] = 'work_hours = ?';
+        $params[] = planner_teacher_report_hours_value($body['work_hours']);
+        $touched = true;
+    }
+    if (array_key_exists('work_indicator', $body)) {
+        $parts[] = 'work_indicator = ?';
+        $params[] = planner_teacher_report_clip($body['work_indicator'], 255);
+        $touched = true;
+    }
+    foreach (['work_start', 'work_end'] as $column) {
+        if (array_key_exists($column, $body)) {
+            $parts[] = $column . ' = ?';
+            $params[] = planner_teacher_report_date_value($body[$column]);
+            $touched = true;
+        }
+    }
+
+    return $touched;
+}
+
+/**
+ * Пункты чек-листа, которые идут в план/отчёт вместо задачи целиком.
+ *
+ * @return list<array<string, mixed>>
+ */
+function planner_task_work_items(int $taskId): array
+{
+    if ($taskId <= 0 || !planner_subtask_work_ready()) {
+        return [];
+    }
+    $order = planner_table_has_column('subtasks', 'sort_order') ? 'sort_order, id' : 'id';
+    $st = db()->prepare(
+        'SELECT id, title, is_done' . planner_subtask_work_select_sql() . '
+         FROM subtasks
+         WHERE task_id = ? AND work_kind IS NOT NULL AND work_kind <> \'\' AND work_hours > 0
+         ORDER BY ' . $order
+    );
+    $st->execute([$taskId]);
+
+    return $st->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Если у пунктов чек-листа заданы часы, часы задачи — их сумма.
+ */
+function planner_task_sync_hours_from_subtasks(int $taskId, int $orgId): void
+{
+    if ($taskId <= 0 || !planner_subtask_work_ready() || !planner_table_has_column('tasks', 'work_hours')) {
+        return;
+    }
+    $st = db()->prepare(
+        'SELECT SUM(work_hours) FROM subtasks
+         WHERE task_id = ? AND work_kind IS NOT NULL AND work_kind <> \'\' AND work_hours > 0'
+    );
+    $st->execute([$taskId]);
+    $sum = $st->fetchColumn();
+    if ($sum === null || $sum === false || (float) $sum <= 0) {
+        return;
+    }
+    db()->prepare('UPDATE tasks SET work_hours = ? WHERE id = ? AND organization_id = ?')
+        ->execute([number_format((float) $sum, 2, '.', ''), $taskId, $orgId]);
+    planner_task_work_report_sync($taskId, $orgId, true);
+}
+
 /**
  * Сотрудники, чей отчёт может выгрузить текущий пользователь.
  *
@@ -469,6 +578,22 @@ function planner_teacher_report_tasks(int $orgId, int $userId, int $year, string
             WHERE tp.task_id = t.id AND tp.user_id = ? AND tp.role = \'assistant\'
         )';
     }
+    $itemsReady = planner_subtask_work_ready();
+    $subAssistSql = '';
+    $itemsSql = '';
+    if ($itemsReady) {
+        $itemsSql = ' OR EXISTS (
+            SELECT 1 FROM subtasks ws
+            WHERE ws.task_id = t.id AND ws.work_kind IS NOT NULL AND ws.work_kind <> \'\' AND ws.work_hours > 0
+        )';
+        if (planner_table_exists('subtask_participants')) {
+            $subAssistSql = ' OR EXISTS (
+                SELECT 1 FROM subtask_participants sp
+                INNER JOIN subtasks ss ON ss.id = sp.subtask_id
+                WHERE ss.task_id = t.id AND sp.user_id = ?
+            )';
+        }
+    }
     $st = db()->prepare(
         'SELECT t.id, t.title, t.description, t.due_date, t.status, t.assignee_id, t.author_id,
                 t.work_edu, t.work_edu_method, t.work_research, t.work_org_method,
@@ -476,9 +601,9 @@ function planner_teacher_report_tasks(int $orgId, int $userId, int $year, string
         . $extra . '
          FROM tasks t
          WHERE t.organization_id = ?
-           AND ' . ($mode === 'report' ? 't.status = \'done\'' : 't.status <> \'cancelled\'') . '
-           AND (t.assignee_id = ? OR (t.assignee_id IS NULL AND t.author_id = ?)' . $assistantSql . ')
-           AND (t.work_edu = 1 OR t.work_edu_method = 1 OR t.work_research = 1 OR t.work_org_method = 1)'
+           AND t.status <> \'cancelled\'
+           AND (t.assignee_id = ? OR (t.assignee_id IS NULL AND t.author_id = ?)' . $assistantSql . $subAssistSql . ')
+           AND (t.work_edu = 1 OR t.work_edu_method = 1 OR t.work_research = 1 OR t.work_org_method = 1' . $itemsSql . ')'
         . $yearSql
         . ' ORDER BY (t.due_date IS NULL), t.due_date, t.id'
     );
@@ -486,19 +611,102 @@ function planner_teacher_report_tasks(int $orgId, int $userId, int $year, string
     if ($assistantSql !== '') {
         $params[] = $userId;
     }
+    if ($subAssistSql !== '') {
+        $params[] = $userId;
+    }
     if ($yearSql !== '') {
         $params[] = $year;
     }
     $st->execute($params);
-    $rows = $st->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($rows as &$row) {
-        $assigneeId = (int) ($row['assignee_id'] ?? 0);
-        $authorId = (int) ($row['author_id'] ?? 0);
-        if ($assigneeId !== $userId && !($assigneeId === 0 && $authorId === $userId)) {
-            $row['report_role'] = 'соисполнитель';
+    $tasks = $st->fetchAll(PDO::FETCH_ASSOC);
+
+    $assistantTaskIds = [];
+    if ($tasks !== [] && planner_table_exists('task_participants')) {
+        $ids = array_map(static fn (array $t): int => (int) $t['id'], $tasks);
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $stA = db()->prepare(
+            "SELECT task_id FROM task_participants WHERE user_id = ? AND role = 'assistant' AND task_id IN ($ph)"
+        );
+        $stA->execute(array_merge([$userId], $ids));
+        foreach ($stA->fetchAll(PDO::FETCH_COLUMN) as $tid) {
+            $assistantTaskIds[(int) $tid] = true;
         }
     }
-    unset($row);
+
+    $rows = [];
+    foreach ($tasks as $task) {
+        $taskId = (int) $task['id'];
+        $assigneeId = (int) ($task['assignee_id'] ?? 0);
+        $authorId = (int) ($task['author_id'] ?? 0);
+        $isMain = $assigneeId === $userId || ($assigneeId === 0 && $authorId === $userId);
+        $isAssistant = isset($assistantTaskIds[$taskId]);
+        $taskDone = (string) ($task['status'] ?? '') === 'done';
+        $items = $itemsReady ? planner_task_work_items($taskId) : [];
+
+        if ($items === []) {
+            if (!$isMain && !$isAssistant) {
+                continue;
+            }
+            if ($mode === 'report' && !$taskDone) {
+                continue;
+            }
+            if (!$isMain) {
+                $task['report_role'] = 'соисполнитель';
+            }
+            $rows[] = $task;
+            continue;
+        }
+
+        $itemAssignees = planner_subtask_assistants_payload_map($taskId);
+        $hasItemAssignments = false;
+        foreach ($items as $item) {
+            if (!empty($itemAssignees[(int) $item['id']])) {
+                $hasItemAssignments = true;
+                break;
+            }
+        }
+        foreach ($items as $item) {
+            $itemId = (int) $item['id'];
+            $mine = false;
+            foreach ($itemAssignees[$itemId] ?? [] as $person) {
+                if ((int) $person['id'] === $userId) {
+                    $mine = true;
+                    break;
+                }
+            }
+            if (!$isMain && !$mine && !($isAssistant && !$hasItemAssignments)) {
+                continue;
+            }
+            if ($mode === 'report' && !$taskDone && empty($item['is_done'])) {
+                continue;
+            }
+            $row = $task;
+            foreach (array_keys(planner_teacher_report_kinds()) as $column) {
+                $row[$column] = $column === $item['work_kind'] ? 1 : 0;
+            }
+            $row['id'] = 0;
+            $row['subtask_id'] = $itemId;
+            $row['title'] = trim((string) $task['title']) . ' — ' . trim((string) $item['title']);
+            $row['description'] = '';
+            $row['work_hours'] = $item['work_hours'];
+            $row['work_hours_first'] = null;
+            $row['work_hours_second'] = null;
+            if (!empty($item['work_start'])) {
+                $row['work_start'] = $item['work_start'];
+            }
+            if (!empty($item['work_end'])) {
+                $row['due_date'] = $item['work_end'];
+            }
+            $indicator = trim((string) ($item['work_indicator'] ?? ''));
+            if ($indicator !== '') {
+                $row['work_indicator'] = $indicator;
+            }
+            if (!$isMain) {
+                $row['report_role'] = 'соисполнитель';
+            }
+            $rows[] = $row;
+        }
+    }
 
     return $rows;
 }

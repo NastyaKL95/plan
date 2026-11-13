@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 require __DIR__ . '/_guard.php';
 require_once dirname(__DIR__, 2) . '/includes/task_extras.php';
+require_once dirname(__DIR__, 2) . '/includes/teacher_report.php';
+planner_teacher_report_ensure_schema();
 
 $id = (int) ($_GET['id'] ?? 0);
 if ($id <= 0) {
@@ -46,6 +48,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
         $parts[] = 'is_done = ?';
         $params[] = !empty($body['is_done']) ? 1 : 0;
     }
+    $workTouched = planner_subtask_work_append_fields($body, $parts, $params);
     if (array_key_exists('assistant_ids', $body) && is_array($body['assistant_ids'])) {
         $assistantTouched = true;
     }
@@ -60,12 +63,16 @@ if ($method === 'PATCH' || $method === 'PUT') {
     if ($assistantTouched) {
         planner_sync_subtask_assistants($orgId, $id, $body['assistant_ids']);
     }
+    if ($workTouched) {
+        planner_task_sync_hours_from_subtasks((int) $row['task_id'], $orgId);
+    }
     log_activity($orgId, $userId, 'update', 'subtask', $id, 'Обновлён пункт чек-листа');
     json_response(['ok' => true]);
 }
 
 if ($method === 'DELETE') {
     db()->prepare('DELETE FROM subtasks WHERE id = ?')->execute([$id]);
+    planner_task_sync_hours_from_subtasks((int) $row['task_id'], $orgId);
     log_activity($orgId, $userId, 'delete', 'subtask', $id, 'Удалён пункт чек-листа');
     json_response(['ok' => true]);
 }

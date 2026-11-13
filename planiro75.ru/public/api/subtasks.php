@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 require __DIR__ . '/_guard.php';
 require_once dirname(__DIR__, 2) . '/includes/task_extras.php';
+require_once dirname(__DIR__, 2) . '/includes/teacher_report.php';
+planner_teacher_report_ensure_schema();
 
 $taskId = (int) ($_GET['task_id'] ?? 0);
 if ($taskId <= 0) {
@@ -26,7 +28,8 @@ if (($method === 'POST' || $method === 'PATCH') && !user_may_edit_task($user, $t
 
 if ($method === 'GET') {
     $st = db()->prepare(
-        'SELECT id, title, is_done, sort_order, created_at FROM subtasks WHERE task_id = ? ORDER BY sort_order, id'
+        'SELECT id, title, is_done, sort_order, created_at' . planner_subtask_work_select_sql()
+        . ' FROM subtasks WHERE task_id = ? ORDER BY sort_order, id'
     );
     $st->execute([$taskId]);
     $items = $st->fetchAll(PDO::FETCH_ASSOC);

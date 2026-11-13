@@ -72,6 +72,7 @@ if ($method === 'GET') {
     $st = db()->prepare(
         "SELECT id, title, is_done, created_at" .
         (planner_table_has_column('subtasks', 'sort_order') ? ', sort_order' : ', 0 AS sort_order') .
+        planner_subtask_work_select_sql() .
         " FROM subtasks WHERE task_id = ? ORDER BY $subOrder"
     );
     $st->execute([$id]);
@@ -401,6 +402,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
             $sql = 'UPDATE tasks SET ' . implode(', ', $fields) . ' WHERE id = ? AND organization_id = ?';
             db()->prepare($sql)->execute($params);
             planner_task_work_report_sync($id, $orgId, array_key_exists('work_hours', $body));
+            planner_task_sync_hours_from_subtasks($id, $orgId);
             log_activity($orgId, $userId, 'update', 'task', $id, 'Обновлена задача');
         }
         if (array_key_exists('tag_ids', $body) && planner_table_exists('task_tag_map')) {
