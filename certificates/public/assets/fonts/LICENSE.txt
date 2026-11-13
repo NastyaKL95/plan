@@ -1,0 +1,6 @@
+Шрифты Tinos и Arimo (Copyright 2010-2012 Google Corporation, семейство Croscore)
+распространяются по лицензии SIL Open Font License 1.1: https://openfontlicense.org
+
+Лицензия разрешает бесплатно использовать, встраивать (в том числе в PDF) и распространять
+шрифты вместе с программой. Продавать сами шрифты отдельно нельзя.
+Полный текст лицензии: https://openfontlicense.org/open-font-license-official-text/
