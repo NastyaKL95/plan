@@ -270,10 +270,11 @@ layout_start($user, 'Мониторинг MAX', 'max_dashboard');
         var r = (res && res.result) || {};
         setText(
           'mxRunResult',
-          'Воркер выполнен: processed=' + String(r.processed || 0) +
-          ', sent=' + String(r.sent || 0) +
-          ', failed=' + String(r.failed || 0) +
-          ', skipped=' + String(r.skipped || 0)
+          'Воркер выполнен: обработано ' + String(r.processed || 0) +
+          ', отправлено ' + String(r.sent || 0) +
+          ', отложено тихими часами ' + String(r.deferred || 0) +
+          ', ошибок ' + String(r.failed || 0) +
+          ', без чата MAX ' + String(r.skipped || 0)
         );
         updateMetrics();
       }).catch(function (e) {

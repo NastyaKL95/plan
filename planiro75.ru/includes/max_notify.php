@@ -78,9 +78,55 @@ function planner_max_is_critical_event(string $eventType): bool
     return in_array($eventType, ['task_comment_mention', 'task_assigned', 'sla_overdue_24h'], true);
 }
 
+/** Часовой пояс сотрудников: тихие часы в профиле заданы по местному времени, а сервер может жить в UTC или по Москве. */
+function planner_local_timezone(): DateTimeZone
+{
+    $cfg = app_config();
+    $name = trim((string) ($cfg['app']['timezone'] ?? $cfg['max']['timezone'] ?? ''));
+    try {
+        return new DateTimeZone($name !== '' ? $name : 'Asia/Chita');
+    } catch (Throwable $e) {
+        return new DateTimeZone('Asia/Chita');
+    }
+}
+
+function planner_max_local_minutes_now(): int
+{
+    $now = new DateTimeImmutable('now', planner_local_timezone());
+
+    return (int) $now->format('G') * 60 + (int) $now->format('i');
+}
+
+function planner_max_humanize_send_error(string $err): string
+{
+    if ($err === '') {
+        return 'неизвестная ошибка';
+    }
+    if (str_contains($err, ' 404') || str_contains($err, 'error.not.found') || str_contains($err, 'chat.not.found')) {
+        return 'чат не найден: проверьте ID чата MAX в профиле сотрудника';
+    }
+    if (str_contains($err, ' 401') || str_contains($err, 'verify.token') || str_contains($err, 'access_token')) {
+        return 'бот не принят MAX: проверьте токен в настройках MAX';
+    }
+    if (str_contains($err, ' 403')) {
+        return 'бот не может писать в этот чат: сотрудник должен начать диалог с ботом';
+    }
+    if (str_contains($err, ' 429')) {
+        return 'MAX ограничил частоту отправки';
+    }
+    if (str_contains($err, 'Malformed UTF-8')) {
+        return 'испорченный текст сообщения';
+    }
+    if (stripos($err, 'timed out') !== false || stripos($err, 'timeout') !== false || stripos($err, 'curl') !== false) {
+        return 'нет связи с MAX';
+    }
+
+    return function_exists('mb_substr') ? mb_substr($err, 0, 120, 'UTF-8') : substr($err, 0, 120);
+}
+
 function planner_max_is_quiet_hours_now(string $startHm, string $endHm): bool
 {
-    $now = (int) date('G') * 60 + (int) date('i');
+    $now = planner_max_local_minutes_now();
     [$sh, $sm] = array_map('intval', explode(':', $startHm));
     [$eh, $em] = array_map('intval', explode(':', $endHm));
     $start = $sh * 60 + $sm;
@@ -97,7 +143,7 @@ function planner_max_is_quiet_hours_now(string $startHm, string $endHm): bool
 function planner_max_quiet_hours_delay_seconds(string $endHm): int
 {
     [$eh, $em] = array_map('intval', explode(':', $endHm));
-    $nowM = (int) date('G') * 60 + (int) date('i');
+    $nowM = planner_max_local_minutes_now();
     $endM = $eh * 60 + $em;
     $deltaM = $endM - $nowM;
     if ($deltaM <= 0) {
@@ -874,8 +920,23 @@ function planner_max_queue_metrics(int $orgId, int $stalePendingMinutes = 15): a
         }
     }
 
-    if ((int) $out['counts']['failed'] > 0) {
-        $out['alerts'][] = 'Есть неотправленные сообщения MAX со статусом failed.';
+    // Старые ошибки (например, неверный chat_id до исправления профиля) не должны держать тревогу вечно:
+    // показываем только ошибки за последние сутки и их причину.
+    $stFail = db()->prepare(
+        "SELECT last_error, COUNT(*) AS cnt FROM notification_events
+         WHERE organization_id = ? AND status = 'failed' AND updated_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
+         GROUP BY last_error ORDER BY cnt DESC LIMIT 3"
+    );
+    $stFail->execute([$orgId]);
+    $failReasons = [];
+    $failRecent = 0;
+    foreach ($stFail->fetchAll(PDO::FETCH_ASSOC) as $fr) {
+        $failRecent += (int) $fr['cnt'];
+        $failReasons[] = planner_max_humanize_send_error((string) ($fr['last_error'] ?? '')) . ' — ' . (int) $fr['cnt'];
+    }
+    $out['counts']['failed_recent'] = $failRecent;
+    if ($failRecent > 0) {
+        $out['alerts'][] = 'Не отправлено за сутки: ' . $failRecent . '. Причины: ' . implode('; ', $failReasons) . '.';
     }
     if (
         (int) $out['counts']['pending_ready'] > 0
@@ -887,10 +948,32 @@ function planner_max_queue_metrics(int $orgId, int $stalePendingMinutes = 15): a
             . ' мин. Нажмите «Прогнать воркер сейчас» или включите cron '
             . '(public/cron/max_notify_worker.php каждую минуту).';
     }
-    if ((int) $out['counts']['pending_deferred'] > 0 && (int) $out['counts']['pending_ready'] === 0) {
-        $out['alerts'][] = 'Часть pending отложена (quiet hours / повтор): '
-            . (int) $out['counts']['pending_deferred']
-            . ' шт. — это нормально до наступления next_retry_at.';
+    if ((int) $out['counts']['pending_deferred'] > 0) {
+        $stDef = db()->prepare(
+            "SELECT
+                SUM(last_error = 'deferred_by_user_quiet_mode') AS user_quiet,
+                SUM(last_error = 'deferred_by_quiet_hours') AS org_quiet,
+                SUM(last_error IS NULL OR last_error NOT IN ('deferred_by_user_quiet_mode', 'deferred_by_quiet_hours')) AS retry
+             FROM notification_events
+             WHERE organization_id = ? AND status = 'pending' AND next_retry_at > NOW()"
+        );
+        $stDef->execute([$orgId]);
+        $def = $stDef->fetch(PDO::FETCH_ASSOC) ?: [];
+        $parts = [];
+        if ((int) ($def['user_quiet'] ?? 0) > 0) {
+            $parts[] = 'тихие часы в профиле сотрудника — ' . (int) $def['user_quiet'];
+        }
+        if ((int) ($def['org_quiet'] ?? 0) > 0) {
+            $parts[] = 'тихие часы организации — ' . (int) $def['org_quiet'];
+        }
+        if ((int) ($def['retry'] ?? 0) > 0) {
+            $parts[] = 'повтор после ошибки отправки — ' . (int) $def['retry'];
+        }
+        $localNow = (new DateTimeImmutable('now', planner_local_timezone()))->format('H:i');
+        $out['alerts'][] = 'Отложено: ' . (int) $out['counts']['pending_deferred']
+            . ($parts !== [] ? ' (' . implode('; ', $parts) . ')' : '')
+            . '. Тихие часы считаются по местному времени, сейчас ' . $localNow
+            . '. Сообщения уйдут сами, когда закончатся тихие часы или подойдёт время повтора.';
     }
     if (
         !$out['heartbeat']['ok']
@@ -1384,17 +1467,21 @@ function planner_max_process_queue(int $limit = 100, int $maxBatches = 8): array
     $limit = max(1, min(500, $limit));
     $maxBatches = max(1, min(20, $maxBatches));
     if (!planner_max_enabled() || !planner_max_events_table_ready()) {
-        return ['processed' => 0, 'sent' => 0, 'failed' => 0, 'skipped' => 0, 'batches' => 0];
+        return ['processed' => 0, 'sent' => 0, 'failed' => 0, 'skipped' => 0, 'deferred' => 0, 'batches' => 0];
     }
     planner_max_enqueue_sla_escalations();
     planner_max_flush_due_digests();
     $sql = "SELECT id, organization_id, user_id, event_type, payload_json, attempts
             FROM notification_events
-            WHERE status = 'pending' AND (next_retry_at IS NULL OR next_retry_at <= NOW())
-            ORDER BY id ASC LIMIT $limit";
-    $out = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'skipped' => 0, 'batches' => 0];
+            WHERE status = 'pending' AND (next_retry_at IS NULL OR next_retry_at <= NOW()
+                OR last_error IN ('deferred_by_quiet_hours', 'deferred_by_user_quiet_mode'))";
+    $out = ['processed' => 0, 'sent' => 0, 'failed' => 0, 'skipped' => 0, 'deferred' => 0, 'batches' => 0];
+    /** @var array<int,true> $seen отложенные тихими часами остаются pending — второй раз за прогон их не берём */
+    $seen = [];
     for ($batchNo = 0; $batchNo < $maxBatches; $batchNo++) {
-        $rows = db()->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+        $batchSql = $sql . ($seen !== [] ? ' AND id NOT IN (' . implode(',', array_keys($seen)) . ')' : '')
+            . " ORDER BY id ASC LIMIT $limit";
+        $rows = db()->query($batchSql)->fetchAll(PDO::FETCH_ASSOC);
         if ($rows === []) {
             break;
         }
@@ -1402,6 +1489,7 @@ function planner_max_process_queue(int $limit = 100, int $maxBatches = 8): array
         $out['processed'] += count($rows);
         foreach ($rows as $r) {
         $id = (int) ($r['id'] ?? 0);
+        $seen[$id] = true;
         $orgId = (int) ($r['organization_id'] ?? 0);
         $userId = (int) ($r['user_id'] ?? 0);
         $attempts = (int) ($r['attempts'] ?? 0);
@@ -1436,7 +1524,7 @@ function planner_max_process_queue(int $limit = 100, int $maxBatches = 8): array
                     SET next_retry_at = DATE_ADD(NOW(), INTERVAL ? SECOND), last_error = ?
                     WHERE id = ?")
                     ->execute([$qDelay, 'deferred_by_quiet_hours', $id]);
-                $out['skipped']++;
+                $out['deferred']++;
                 continue;
             }
             $uprefs = planner_max_user_prefs($orgId, $userId);
@@ -1450,7 +1538,7 @@ function planner_max_process_queue(int $limit = 100, int $maxBatches = 8): array
                     SET next_retry_at = DATE_ADD(NOW(), INTERVAL ? SECOND), last_error = ?
                     WHERE id = ?")
                     ->execute([$qDelay, 'deferred_by_user_quiet_mode', $id]);
-                $out['skipped']++;
+                $out['deferred']++;
                 continue;
             }
             planner_max_send_chat_message($chatId, $text, $orgId, $messageId);
