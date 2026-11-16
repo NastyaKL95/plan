@@ -113,7 +113,7 @@
         p.id +
         '" data-source-portfolio-id="' +
         src +
-        '" draggable="true"><div class="project-dot"></div>' +
+        '" draggable="' + (p.can_edit ? 'true' : 'false') + '"><div class="project-dot"></div>' +
         dept +
         '<h3>' +
         escapeHtml(p.name) +
@@ -123,10 +123,12 @@
         '<a class="project-open-tasks-btn" data-tip="Открыть задачи" href="' +
         apiUrl('/tasks.php?project_id=' + encodeURIComponent(p.id)) +
         '" title="Открыть задачи проекта" aria-label="Открыть задачи проекта"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M3 5a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v2H3V5z" fill="currentColor"></path><path d="M3 10h18l-2 9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2l-2-9z" fill="currentColor"></path></svg></a>' +
-        '<button type="button" class="project-edit-btn project-edit-icon-btn" data-tip="Редактировать проект" data-id="' +
-        p.id +
-        '" title="Редактировать проект" aria-label="Редактировать проект"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M3 17.25V21h3.75L18.81 8.94l-3.75-3.75L3 17.25z" fill="currentColor"></path><path d="M20.71 7.04a1.003 1.003 0 000-1.42L18.37 3.29a1.003 1.003 0 00-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.83z" fill="currentColor"></path></svg></button>' +
-        (src
+        (p.can_edit
+          ? '<button type="button" class="project-edit-btn project-edit-icon-btn" data-tip="Редактировать проект" data-id="' +
+            p.id +
+            '" title="Редактировать проект" aria-label="Редактировать проект"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M3 17.25V21h3.75L18.81 8.94l-3.75-3.75L3 17.25z" fill="currentColor"></path><path d="M20.71 7.04a1.003 1.003 0 000-1.42L18.37 3.29a1.003 1.003 0 00-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.83z" fill="currentColor"></path></svg></button>'
+          : '') +
+        (src && p.can_edit
           ? '<button type="button" class="portfolio-project-unlink link-btn" data-project-id="' +
             p.id +
             '" data-source-portfolio-id="' +
@@ -159,13 +161,16 @@
           : '') +
         '<span class="portfolio-dot"></span><h3 class="portfolio-title">' +
         escapeHtml(pf.name) +
-        '</h3></div><div class="portfolio-actions"><button type="button" class="portfolio-menu-toggle" data-id="' +
+        '</h3></div><div class="portfolio-actions"' +
+        (canCreateProjects || canDeletePortfolios ? '' : ' hidden') +
+        '><button type="button" class="portfolio-menu-toggle" data-id="' +
         pf.id +
         '" aria-label="Действия">⋯</button><div class="portfolio-menu" data-menu-id="' +
         pf.id +
-        '" hidden><button type="button" class="portfolio-menu-item portfolio-edit" data-id="' +
-        pf.id +
-        '">Изменить</button>' +
+        '" hidden>' +
+        (canCreateProjects
+          ? '<button type="button" class="portfolio-menu-item portfolio-edit" data-id="' + pf.id + '">Изменить</button>'
+          : '') +
         (canCreateProjects
           ? '<button type="button" class="portfolio-menu-item portfolio-add-child" data-id="' +
             pf.id +
