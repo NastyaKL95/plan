@@ -2,6 +2,7 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS documents;
 DROP TABLE IF EXISTS activity_log;
 DROP TABLE IF EXISTS subtasks;
 DROP TABLE IF EXISTS task_attachments;
@@ -417,6 +418,34 @@ CREATE TABLE max_settings (
   updated_by INT UNSIGNED NULL,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_ms_org FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Документы организации: инструкции, положения, регламенты, приказы
+CREATE TABLE documents (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  organization_id INT UNSIGNED NOT NULL,
+  doc_type VARCHAR(20) NOT NULL,
+  title VARCHAR(500) NOT NULL,
+  doc_number VARCHAR(60) NULL,
+  doc_date DATE NULL,
+  description TEXT NULL,
+  department_id INT UNSIGNED NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  is_pinned TINYINT(1) NOT NULL DEFAULT 0,
+  original_name VARCHAR(255) NOT NULL,
+  stored_name VARCHAR(64) NOT NULL,
+  mime VARCHAR(120) NOT NULL DEFAULT 'application/octet-stream',
+  size_bytes INT UNSIGNED NOT NULL DEFAULT 0,
+  content_text MEDIUMTEXT NULL,
+  downloads INT UNSIGNED NOT NULL DEFAULT 0,
+  uploaded_by INT UNSIGNED NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_documents_org_type (organization_id, doc_type, doc_date),
+  KEY idx_documents_dept (department_id),
+  CONSTRAINT fk_documents_org FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  CONSTRAINT fk_documents_dept FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL,
+  CONSTRAINT fk_documents_user FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO organizations (name, work_year) VALUES ('Институт развития образования Забайкальского края', YEAR(CURRENT_DATE));

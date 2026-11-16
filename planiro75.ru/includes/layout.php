@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 /**
  * @param array $user from require_login()
- * @param string $active 'dashboard'|'tasks'|'department_tasks'|'tags'|'automation'|'plan_year'|'projects'|'departments'|'reports'|'users'|'max_dashboard'|'max_notifications'
+ * @param string $active 'dashboard'|'tasks'|'department_tasks'|'tags'|'automation'|'plan_year'|'projects'|'departments'|'reports'|'users'|'max_dashboard'|'max_notifications'|'documents'
  */
 function layout_start(array $user, string $title, string $active = 'dashboard'): void
 {
@@ -58,6 +58,9 @@ function layout_start(array $user, string $title, string $active = 'dashboard'):
     <a class="bx-ibar-item<?= $active === 'tags' ? ' is-active' : '' ?>" href="<?= $url('/tags.php') ?>" title="Метки">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/></svg>
     </a>
+    <a class="bx-ibar-item<?= $active === 'documents' ? ' is-active' : '' ?>" href="<?= $url('/documents.php') ?>" title="Документы">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+    </a>
     <a class="bx-ibar-item<?= $active === 'automation' ? ' is-active' : '' ?>" href="<?= $url('/automation.php') ?>" title="Автоматизация">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
     </a>
@@ -97,6 +100,7 @@ function layout_start(array $user, string $title, string $active = 'dashboard'):
         <a class="bx-toplink<?= $active === 'dashboard' ? ' is-active' : '' ?>" href="<?= $url('/index.php') ?>">Обзор</a>
         <a class="bx-toplink<?= $active === 'tasks' ? ' is-active' : '' ?>" href="<?= $url('/tasks.php') ?>">Задачи</a>
         <a class="bx-toplink<?= $active === 'projects' ? ' is-active' : '' ?>" href="<?= $url('/projects.php') ?>">Проекты</a>
+        <a class="bx-toplink<?= $active === 'documents' ? ' is-active' : '' ?>" href="<?= $url('/documents.php') ?>">Документы</a>
 
         <a class="bx-toplink<?= $active === 'reports' ? ' is-active' : '' ?>" href="<?= $url('/reports.php') ?>">Отчёты</a>
         <?php if ($mayAdminNav): ?>
