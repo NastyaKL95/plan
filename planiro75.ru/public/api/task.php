@@ -163,6 +163,7 @@ if ($method === 'GET') {
     } else {
         $task['may_edit'] = user_may_edit_task($user, $id);
     }
+    $task['may_delete'] = user_may_delete_task($user, $id);
     json_response(['ok' => true, 'task' => $task]);
 }
 

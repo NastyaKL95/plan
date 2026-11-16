@@ -573,6 +573,10 @@ a:hover {
   cursor: pointer;
 }
 
+.btn[hidden] {
+  display: none !important;
+}
+
 .btn-primary {
   border-radius: 999px;
   background: var(--primary);

@@ -141,6 +141,8 @@
     }
     var footE = document.querySelector('.task-modal-footer-edit');
     if (footE) footE.hidden = !mayEdit;
+    var btnDel = $('btnDeleteTask');
+    if (btnDel) btnDel.hidden = !(task && task.may_delete);
     if (mayEdit && task) {
       setTaskProjectFieldReadOnly(task);
     } else {
