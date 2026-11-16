@@ -28,6 +28,7 @@ $period = (string) ($_GET['period'] ?? '30d');
 $daysMap = ['7d' => 7, '30d' => 30, '90d' => 90];
 $days = $daysMap[$period] ?? 30;
 $rangeExpr = "DATE_SUB(NOW(), INTERVAL $days DAY)";
+$doneAt = planner_task_done_at_sql();
 
 header('Content-Type: text/csv; charset=UTF-8');
 header('Cache-Control: no-store');
@@ -55,7 +56,8 @@ $score = static function (array $r) use ($normRate): float {
     $active = (int) ($r['active_total'] ?? 0);
     $over = (int) ($r['overdue_active'] ?? 0);
     $onTime = $normRate($doneIn, $done);
-    $completion = $normRate($done, $created);
+    // Закрытых за период может быть больше созданных (закрыли старые задачи) — индекс не должен уходить за 100.
+    $completion = min(100.0, $normRate($done, $created));
     $backlog = max(0.0, 100.0 - $normRate($over, max(1, $active)));
     return round(0.45 * $onTime + 0.25 * $completion + 0.30 * $backlog, 1);
 };
@@ -66,8 +68,8 @@ if ($mode === 'employees') {
     foreach ($rows as $r) {
         $onTime = $normRate((int) $r['done_in_time'], (int) $r['done_total']);
         fputcsv($out, [
-            (string) ($r['user_name'] ?? 'Без исполнителя'),
-            (string) ($r['department_name'] ?? ''),
+            planner_csv_text((string) ($r['user_name'] ?? 'Без исполнителя')),
+            planner_csv_text((string) ($r['department_name'] ?? '')),
             (int) ($r['created_total'] ?? 0),
             (int) ($r['done_total'] ?? 0),
             $onTime,
@@ -82,9 +84,9 @@ if ($mode === 'employees') {
     $sql = "SELECT
         d.name AS department_name,
         SUM(CASE WHEN t.created_at >= $rangeExpr THEN 1 ELSE 0 END) AS created_total,
-        SUM(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr THEN 1 ELSE 0 END) AS done_total,
-        SUM(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr
-            AND (t.due_date IS NULL OR t.updated_at <= t.due_date) THEN 1 ELSE 0 END) AS done_in_time,
+        SUM(CASE WHEN t.status = 'done' AND {$doneAt} >= $rangeExpr THEN 1 ELSE 0 END) AS done_total,
+        SUM(CASE WHEN t.status = 'done' AND {$doneAt} >= $rangeExpr
+            AND (t.due_date IS NULL OR {$doneAt} <= t.due_date) THEN 1 ELSE 0 END) AS done_in_time,
         SUM(CASE WHEN t.status NOT IN ('done','cancelled') THEN 1 ELSE 0 END) AS active_total,
         SUM(CASE WHEN t.status NOT IN ('done','cancelled') AND t.due_date IS NOT NULL AND t.due_date < NOW() THEN 1 ELSE 0 END) AS overdue_active,
         SUM(CASE WHEN t.assignee_id IS NULL THEN 1 ELSE 0 END) AS without_assignee,
@@ -100,7 +102,7 @@ if ($mode === 'employees') {
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
         $onTime = $normRate((int) $r['done_in_time'], (int) $r['done_total']);
         fputcsv($out, [
-            (string) ($r['department_name'] ?? ''),
+            planner_csv_text((string) ($r['department_name'] ?? '')),
             (int) ($r['created_total'] ?? 0),
             (int) ($r['done_total'] ?? 0),
             $onTime,

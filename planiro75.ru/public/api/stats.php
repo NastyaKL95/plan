@@ -39,7 +39,7 @@ if (!$hasProjectDept) {
             SUM(CASE WHEN t.status = \'cancelled\' THEN 1 ELSE 0 END) AS n_cancelled,
             COUNT(*) AS total_tasks,
             SUM(CASE WHEN t.created_at >= CURDATE() AND t.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY) THEN 1 ELSE 0 END) AS today_created,
-            SUM(CASE WHEN t.status = \'done\' AND t.updated_at >= CURDATE() AND t.updated_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY) THEN 1 ELSE 0 END) AS today_done
+            SUM(CASE WHEN t.status = \'done\' AND ' . planner_task_done_at_sql() . ' >= CURDATE() AND ' . planner_task_done_at_sql() . ' < DATE_ADD(CURDATE(), INTERVAL 1 DAY) THEN 1 ELSE 0 END) AS today_done
         FROM tasks t
         WHERE t.organization_id = ?' . $tw['sql'];
     $st = db()->prepare($summarySql);
@@ -88,7 +88,7 @@ $summarySqlScoped = 'SELECT
         SUM(CASE WHEN t.status = \'cancelled\' THEN 1 ELSE 0 END) AS n_cancelled,
         COUNT(*) AS total_tasks,
         SUM(CASE WHEN t.created_at >= CURDATE() AND t.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY) THEN 1 ELSE 0 END) AS today_created,
-        SUM(CASE WHEN t.status = \'done\' AND t.updated_at >= CURDATE() AND t.updated_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY) THEN 1 ELSE 0 END) AS today_done
+        SUM(CASE WHEN t.status = \'done\' AND ' . planner_task_done_at_sql() . ' >= CURDATE() AND ' . planner_task_done_at_sql() . ' < DATE_ADD(CURDATE(), INTERVAL 1 DAY) THEN 1 ELSE 0 END) AS today_done
     FROM tasks t
     INNER JOIN projects p ON p.id = t.project_id
     WHERE t.organization_id = ?' . $scope['sql'] . $tw['sql'];

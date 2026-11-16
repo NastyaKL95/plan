@@ -75,6 +75,7 @@ function planner_reports_efficiency_employees(
     array $taskScope,
     array $workYear
 ): array {
+    $doneAt = planner_task_done_at_sql();
     $level = planner_reports_efficiency_level($user);
     if ($level === 'self') {
         return planner_reports_efficiency_employees_from_tasks($orgId, $rangeExpr, $taskScope, $workYear);
@@ -124,12 +125,12 @@ function planner_reports_efficiency_employees(
     LEFT JOIN (
         SELECT t.assignee_id AS user_id,
             SUM(CASE WHEN t.created_at >= $rangeExpr THEN 1 ELSE 0 END) AS created_total,
-            SUM(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr THEN 1 ELSE 0 END) AS done_total,
-            SUM(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr
-                AND (t.due_date IS NULL OR t.updated_at <= t.due_date) THEN 1 ELSE 0 END) AS done_in_time,
+            SUM(CASE WHEN t.status = 'done' AND {$doneAt} >= $rangeExpr THEN 1 ELSE 0 END) AS done_total,
+            SUM(CASE WHEN t.status = 'done' AND {$doneAt} >= $rangeExpr
+                AND (t.due_date IS NULL OR {$doneAt} <= t.due_date) THEN 1 ELSE 0 END) AS done_in_time,
             SUM(CASE WHEN t.status NOT IN ('done','cancelled') THEN 1 ELSE 0 END) AS active_total,
             SUM(CASE WHEN t.status NOT IN ('done','cancelled') AND t.due_date IS NOT NULL AND t.due_date < NOW() THEN 1 ELSE 0 END) AS overdue_active,
-            AVG(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr THEN TIMESTAMPDIFF(HOUR, t.created_at, t.updated_at) END) AS avg_close_hours
+            AVG(CASE WHEN t.status = 'done' AND {$doneAt} >= $rangeExpr THEN TIMESTAMPDIFF(HOUR, t.created_at, {$doneAt}) END) AS avg_close_hours
         FROM tasks t
         INNER JOIN projects p ON p.id = t.project_id
         WHERE t.organization_id = ? AND t.assignee_id IS NOT NULL" . $taskScope['sql'] . $workYear['sql'] . "
@@ -192,17 +193,18 @@ function planner_reports_efficiency_employees_from_tasks(
     array $taskScope,
     array $workYear
 ): array {
+    $doneAt = planner_task_done_at_sql();
     $sql = "SELECT
         u.id AS user_id,
         u.name AS user_name,
         d.name AS department_name,
         SUM(CASE WHEN t.created_at >= $rangeExpr THEN 1 ELSE 0 END) AS created_total,
-        SUM(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr THEN 1 ELSE 0 END) AS done_total,
-        SUM(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr
-            AND (t.due_date IS NULL OR t.updated_at <= t.due_date) THEN 1 ELSE 0 END) AS done_in_time,
+        SUM(CASE WHEN t.status = 'done' AND {$doneAt} >= $rangeExpr THEN 1 ELSE 0 END) AS done_total,
+        SUM(CASE WHEN t.status = 'done' AND {$doneAt} >= $rangeExpr
+            AND (t.due_date IS NULL OR {$doneAt} <= t.due_date) THEN 1 ELSE 0 END) AS done_in_time,
         SUM(CASE WHEN t.status NOT IN ('done','cancelled') THEN 1 ELSE 0 END) AS active_total,
         SUM(CASE WHEN t.status NOT IN ('done','cancelled') AND t.due_date IS NOT NULL AND t.due_date < NOW() THEN 1 ELSE 0 END) AS overdue_active,
-        AVG(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr THEN TIMESTAMPDIFF(HOUR, t.created_at, t.updated_at) END) AS avg_close_hours
+        AVG(CASE WHEN t.status = 'done' AND {$doneAt} >= $rangeExpr THEN TIMESTAMPDIFF(HOUR, t.created_at, {$doneAt}) END) AS avg_close_hours
     FROM tasks t
     INNER JOIN projects p ON p.id = t.project_id
     LEFT JOIN users u ON u.id = t.assignee_id
@@ -232,14 +234,15 @@ function planner_reports_efficiency_unassigned_row(
     array $taskScope,
     array $workYear
 ): ?array {
+    $doneAt = planner_task_done_at_sql();
     $sql = "SELECT
         SUM(CASE WHEN t.created_at >= $rangeExpr THEN 1 ELSE 0 END) AS created_total,
-        SUM(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr THEN 1 ELSE 0 END) AS done_total,
-        SUM(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr
-            AND (t.due_date IS NULL OR t.updated_at <= t.due_date) THEN 1 ELSE 0 END) AS done_in_time,
+        SUM(CASE WHEN t.status = 'done' AND {$doneAt} >= $rangeExpr THEN 1 ELSE 0 END) AS done_total,
+        SUM(CASE WHEN t.status = 'done' AND {$doneAt} >= $rangeExpr
+            AND (t.due_date IS NULL OR {$doneAt} <= t.due_date) THEN 1 ELSE 0 END) AS done_in_time,
         SUM(CASE WHEN t.status NOT IN ('done','cancelled') THEN 1 ELSE 0 END) AS active_total,
         SUM(CASE WHEN t.status NOT IN ('done','cancelled') AND t.due_date IS NOT NULL AND t.due_date < NOW() THEN 1 ELSE 0 END) AS overdue_active,
-        AVG(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr THEN TIMESTAMPDIFF(HOUR, t.created_at, t.updated_at) END) AS avg_close_hours
+        AVG(CASE WHEN t.status = 'done' AND {$doneAt} >= $rangeExpr THEN TIMESTAMPDIFF(HOUR, t.created_at, {$doneAt}) END) AS avg_close_hours
     FROM tasks t
     INNER JOIN projects p ON p.id = t.project_id
     WHERE t.organization_id = ? AND t.assignee_id IS NULL" . $taskScope['sql'] . $workYear['sql'];

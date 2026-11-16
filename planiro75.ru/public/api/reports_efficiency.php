@@ -14,6 +14,7 @@ $period = (string) ($_GET['period'] ?? '30d');
 $daysMap = ['7d' => 7, '30d' => 30, '90d' => 90];
 $days = $daysMap[$period] ?? 30;
 $rangeExpr = "DATE_SUB(NOW(), INTERVAL $days DAY)";
+$doneAt = planner_task_done_at_sql();
 
 if (!$hasProjectDept) {
     json_response([
@@ -59,12 +60,12 @@ if (is_file($cacheFile) && (time() - (int) @filemtime($cacheFile)) < $cacheTtl) 
 
 $kpiSql = "SELECT
     SUM(CASE WHEN t.created_at >= $rangeExpr THEN 1 ELSE 0 END) AS created_total,
-    SUM(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr THEN 1 ELSE 0 END) AS done_total,
-    SUM(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr
-        AND (t.due_date IS NULL OR t.updated_at <= t.due_date) THEN 1 ELSE 0 END) AS done_in_time,
+    SUM(CASE WHEN t.status = 'done' AND {$doneAt} >= $rangeExpr THEN 1 ELSE 0 END) AS done_total,
+    SUM(CASE WHEN t.status = 'done' AND {$doneAt} >= $rangeExpr
+        AND (t.due_date IS NULL OR {$doneAt} <= t.due_date) THEN 1 ELSE 0 END) AS done_in_time,
     SUM(CASE WHEN t.status NOT IN ('done','cancelled') AND t.due_date IS NOT NULL AND t.due_date < NOW() THEN 1 ELSE 0 END) AS overdue_active,
     SUM(CASE WHEN t.status NOT IN ('done','cancelled') THEN 1 ELSE 0 END) AS active_total,
-    AVG(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr THEN TIMESTAMPDIFF(HOUR, t.created_at, t.updated_at) END) AS avg_close_hours
+    AVG(CASE WHEN t.status = 'done' AND {$doneAt} >= $rangeExpr THEN TIMESTAMPDIFF(HOUR, t.created_at, {$doneAt}) END) AS avg_close_hours
 " . $fromWhere;
 $st = db()->prepare($kpiSql);
 planner_timed_execute($st, $params, $kpiSql, 'eff.kpi');
@@ -76,9 +77,9 @@ $depSql = "SELECT
     d.id AS department_id,
     d.name AS department_name,
     SUM(CASE WHEN t.created_at >= $rangeExpr THEN 1 ELSE 0 END) AS created_total,
-    SUM(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr THEN 1 ELSE 0 END) AS done_total,
-    SUM(CASE WHEN t.status = 'done' AND t.updated_at >= $rangeExpr
-        AND (t.due_date IS NULL OR t.updated_at <= t.due_date) THEN 1 ELSE 0 END) AS done_in_time,
+    SUM(CASE WHEN t.status = 'done' AND {$doneAt} >= $rangeExpr THEN 1 ELSE 0 END) AS done_total,
+    SUM(CASE WHEN t.status = 'done' AND {$doneAt} >= $rangeExpr
+        AND (t.due_date IS NULL OR {$doneAt} <= t.due_date) THEN 1 ELSE 0 END) AS done_in_time,
     SUM(CASE WHEN t.status NOT IN ('done','cancelled') THEN 1 ELSE 0 END) AS active_total,
     SUM(CASE WHEN t.status NOT IN ('done','cancelled') AND t.due_date IS NOT NULL AND t.due_date < NOW() THEN 1 ELSE 0 END) AS overdue_active,
     SUM(CASE WHEN t.assignee_id IS NULL THEN 1 ELSE 0 END) AS without_assignee,
@@ -104,11 +105,11 @@ FROM (
     WHERE t.organization_id = ? AND t.created_at >= $rangeExpr" . $scope['sql'] . $tw['sql'] . "
     GROUP BY DATE(t.created_at)
     UNION ALL
-    SELECT DATE(t.updated_at) AS day, 0 AS created_c, COUNT(*) AS done_c
+    SELECT DATE({$doneAt}) AS day, 0 AS created_c, COUNT(*) AS done_c
     FROM tasks t
     INNER JOIN projects p ON p.id = t.project_id
-    WHERE t.organization_id = ? AND t.status = 'done' AND t.updated_at >= $rangeExpr" . $scope['sql'] . $tw['sql'] . "
-    GROUP BY DATE(t.updated_at)
+    WHERE t.organization_id = ? AND t.status = 'done' AND {$doneAt} >= $rangeExpr" . $scope['sql'] . $tw['sql'] . "
+    GROUP BY DATE({$doneAt})
 ) x
 GROUP BY week_label
 ORDER BY week_label ASC";
@@ -127,7 +128,8 @@ $score = static function (array $r) use ($normRate): float {
     $active = (int) ($r['active_total'] ?? 0);
     $over = (int) ($r['overdue_active'] ?? 0);
     $onTime = $normRate($doneIn, $done);
-    $completion = $normRate($done, $created);
+    // Закрытых за период может быть больше созданных (закрыли старые задачи) — индекс не должен уходить за 100.
+    $completion = min(100.0, $normRate($done, $created));
     $backlog = max(0.0, 100.0 - $normRate($over, max(1, $active)));
     return round(0.45 * $onTime + 0.25 * $completion + 0.30 * $backlog, 1);
 };

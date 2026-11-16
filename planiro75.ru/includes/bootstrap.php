@@ -136,6 +136,20 @@ function planner_timed_execute(PDOStatement $st, array $params, string $sql, str
  *
  * @param 'users'|'projects'|'tasks'|'departments'|'department_heads'|'organizations' $table
  */
+/** Ячейка CSV с текстом пользователя: Excel выполняет значения, начинающиеся с = + - @, как формулы. */
+function planner_csv_text(string $value): string
+{
+    return $value !== '' && strpbrk($value[0], "=+-@\t\r") !== false ? "'" . $value : $value;
+}
+
+/** Момент закрытия задачи: updated_at меняется при любой правке, поэтому для отчётов берём время смены статуса. */
+function planner_task_done_at_sql(string $alias = 't'): string
+{
+    return planner_table_has_column('tasks', 'status_changed_at')
+        ? 'COALESCE(' . $alias . '.status_changed_at, ' . $alias . '.updated_at)'
+        : $alias . '.updated_at';
+}
+
 function planner_table_has_column(string $table, string $column): bool
 {
     static $cache = [];
