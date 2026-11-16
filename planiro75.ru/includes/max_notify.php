@@ -126,10 +126,10 @@ function planner_max_flush_due_digests(int $limitUsers = 200): int
             continue;
         }
         $prefs = planner_max_user_prefs($orgId, $userId);
-        if (empty($prefs['digest_enabled'])) {
-            continue;
-        }
-        $interval = max(15, min(1440, (int) ($prefs['digest_interval_minutes'] ?? 60)));
+        // Если дайджест выключили, накопленное отправляем сразу, иначе очередь пользователя не очистится никогда.
+        $interval = empty($prefs['digest_enabled'])
+            ? 0
+            : max(15, min(1440, (int) ($prefs['digest_interval_minutes'] ?? 60)));
         $ageSql = db()->prepare(
             "SELECT TIMESTAMPDIFF(MINUTE, MIN(created_at), NOW()) FROM max_digest_queue WHERE organization_id = ? AND user_id = ?"
         );
@@ -139,7 +139,7 @@ function planner_max_flush_due_digests(int $limitUsers = 200): int
             continue;
         }
         $st = db()->prepare(
-            "SELECT event_type, task_id, text
+            "SELECT id, event_type, task_id, text
              FROM max_digest_queue
              WHERE organization_id = ? AND user_id = ?
              ORDER BY id ASC
@@ -165,7 +165,11 @@ function planner_max_flush_due_digests(int $limitUsers = 200): int
         if (!planner_max_enqueue_event($orgId, $userId, 0, 'digest_summary', $msg, ['count' => count($rows)], 60)) {
             continue;
         }
-        db()->prepare("DELETE FROM max_digest_queue WHERE organization_id = ? AND user_id = ?")->execute([$orgId, $userId]);
+        $ids = array_map(static fn (array $r): int => (int) $r['id'], $rows);
+        db()->prepare(
+            'DELETE FROM max_digest_queue WHERE organization_id = ? AND user_id = ? AND id IN ('
+            . implode(',', array_fill(0, count($ids), '?')) . ')'
+        )->execute(array_merge([$orgId, $userId], $ids));
         $sent++;
     }
     return $sent;
@@ -1232,6 +1236,17 @@ function planner_max_legacy_runtime_queue(string $chatId, string $text): void
     });
 }
 
+function planner_max_event_key_exists(string $dedupeKey): bool
+{
+    if (!planner_max_events_table_ready()) {
+        return false;
+    }
+    $st = db()->prepare('SELECT 1 FROM notification_events WHERE dedupe_key = ? LIMIT 1');
+    $st->execute([$dedupeKey]);
+
+    return (bool) $st->fetchColumn();
+}
+
 function planner_max_dedupe_key(string $eventType, int $orgId, int $userId, int $taskId, int $bucketSec = 120): string
 {
     $bucketSec = max(30, min(3600, $bucketSec));
@@ -1249,7 +1264,8 @@ function planner_max_enqueue_event(
     string $eventType,
     string $text,
     array $payload = [],
-    int $bucketSec = 120
+    int $bucketSec = 120,
+    ?string $stableDedupeKey = null
 ): bool {
     if (!planner_max_enabled()) {
         return false;
@@ -1273,9 +1289,13 @@ function planner_max_enqueue_event(
         planner_max_legacy_runtime_queue($chatId, $text);
         return true;
     }
+    if ($stableDedupeKey !== null && planner_max_event_key_exists($stableDedupeKey)) {
+        return false;
+    }
     $prefsForDigest = planner_max_user_prefs($orgId, $userId);
     if (
-        !planner_max_is_critical_event($eventType)
+        $stableDedupeKey === null
+        && !planner_max_is_critical_event($eventType)
         && !empty($prefsForDigest['digest_enabled'])
         && planner_table_exists('max_digest_queue')
         && $eventType !== 'digest_summary'
@@ -1287,7 +1307,10 @@ function planner_max_enqueue_event(
         )->execute([$orgId, $userId, $eventType, $taskId > 0 ? $taskId : null, $text]);
         return true;
     }
-    $dedupeKey = planner_max_dedupe_key($eventType, $orgId, $userId, max(0, $taskId), $bucketSec);
+    // В ключ входит хеш текста: два разных события одного вида за окно дедупликации (например, два комментария)
+    // не должны схлопываться в одно, а повторная отправка того же текста — должна.
+    $dedupeKey = $stableDedupeKey
+        ?? planner_max_dedupe_key($eventType, $orgId, $userId, max(0, $taskId), $bucketSec) . ':' . substr(sha1($text), 0, 12);
     $payload['message_id'] = hash('sha256', $dedupeKey);
     $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     $sql = "INSERT INTO notification_events
@@ -1580,20 +1603,20 @@ function planner_max_enqueue_sla_escalations(): void
     if (!planner_max_enabled() || !planner_table_exists('tasks')) {
         return;
     }
-    $rt = planner_max_runtime_settings();
-    $staleDays = max(1, min(60, (int) ($rt['stale_days'] ?? 3)));
-    $sql = "SELECT t.id, t.organization_id, t.title, t.due_date, t.updated_at, t.assignee_id
+    $sql = "SELECT t.id, t.organization_id, t.title, t.status, t.due_date, t.updated_at, t.assignee_id
             FROM tasks t
             WHERE t.assignee_id IS NOT NULL
               AND t.status IN ('new', 'in_progress', 'review')
               AND (
                 (t.due_date IS NOT NULL AND t.due_date BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 2 HOUR))
                 OR (t.due_date IS NOT NULL AND t.due_date <= DATE_SUB(NOW(), INTERVAL 24 HOUR))
-                OR (t.updated_at <= DATE_SUB(NOW(), INTERVAL {$staleDays} DAY))
+                OR (t.updated_at <= DATE_SUB(NOW(), INTERVAL 1 DAY))
               )
             ORDER BY t.id DESC
-            LIMIT 200";
+            LIMIT 500";
     $rows = db()->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    /** @var array<int,int> $staleDaysByOrg */
+    $staleDaysByOrg = [];
     foreach ($rows as $r) {
         $orgId = (int) ($r['organization_id'] ?? 0);
         $taskId = (int) ($r['id'] ?? 0);
@@ -1601,6 +1624,13 @@ function planner_max_enqueue_sla_escalations(): void
         if ($orgId <= 0 || $taskId <= 0 || $uid <= 0) {
             continue;
         }
+        if (!isset($staleDaysByOrg[$orgId])) {
+            $staleDaysByOrg[$orgId] = max(1, min(60, (int) (planner_max_runtime_settings($orgId)['stale_days'] ?? 3)));
+        }
+        $staleDays = $staleDaysByOrg[$orgId];
+        // Ключи без временного окна: напоминание о сроке — один раз на срок, о просрочке — раз в сутки,
+        // о застое — один раз, пока задачу не изменят. Раньше всё это повторялось каждый час.
+        $keyBase = $orgId . ':' . $uid . ':' . $taskId . ':';
         $title = trim((string) ($r['title'] ?? ''));
         if ($title === '') {
             $title = 'Задача #' . $taskId;
@@ -1612,22 +1642,26 @@ function planner_max_enqueue_sla_escalations(): void
             if ($ts > time() && $ts <= time() + 7200) {
                 $msg = "⚠ SLA: срок скоро\nЗадача: {$title}\nСрок: " . substr($due, 0, 16)
                     . "\nДействие: проверьте приоритет и завершите вовремя.\nОткрыть: " . planner_public_task_link($taskId);
-                planner_max_enqueue_event($orgId, $uid, $taskId, 'sla_due_2h', $msg, ['due' => $due], 1800);
+                planner_max_enqueue_event($orgId, $uid, $taskId, 'sla_due_2h', $msg, ['due' => $due], 1800, 'sla_due_2h:' . $keyBase . $due);
             }
-            if ($ts <= time() - 86400) {
+            $overdueKey = 'sla_overdue_24h:' . $keyBase . $due . ':' . date('Y-m-d');
+            if ($ts <= time() - 86400 && !planner_max_event_key_exists($overdueKey)) {
                 $msg = "🚨 SLA: просрочка > 24ч\nЗадача: {$title}\nСрок: " . substr($due, 0, 16)
                     . "\nДействие: согласуйте новый срок или завершите задачу.\nОткрыть: " . planner_public_task_link($taskId);
-                $doneTok = planner_max_create_action_token($orgId, $uid, $taskId, 'done');
-                if ($doneTok !== []) {
-                    $msg .= "\n✅ Выполнено: " . planner_public_site_url('/max_action.php?token=' . rawurlencode((string) $doneTok['token']));
+                // Из «Новой» сразу в «Выполнена» перейти нельзя, поэтому такой задаче предлагаем взять её в работу.
+                $isNew = (string) ($r['status'] ?? '') === 'new';
+                $actTok = planner_max_create_action_token($orgId, $uid, $taskId, $isNew ? 'take' : 'done');
+                if ($actTok !== []) {
+                    $msg .= ($isNew ? "\n▶ Взять в работу: " : "\n✅ Выполнено: ")
+                        . planner_public_site_url('/max_action.php?token=' . rawurlencode((string) $actTok['token']));
                 }
-                planner_max_enqueue_event($orgId, $uid, $taskId, 'sla_overdue_24h', $msg, ['due' => $due], 3600);
+                planner_max_enqueue_event($orgId, $uid, $taskId, 'sla_overdue_24h', $msg, ['due' => $due], 3600, $overdueKey);
             }
         }
         if ($updated !== '' && strtotime($updated) !== false && strtotime($updated) <= time() - ($staleDays * 86400)) {
             $msg = "📌 SLA: нет движения {$staleDays}+ дн.\nЗадача: {$title}\nПоследнее изменение: " . substr($updated, 0, 16)
                 . "\nДействие: обновите статус или добавьте комментарий.\nОткрыть: " . planner_public_task_link($taskId);
-            planner_max_enqueue_event($orgId, $uid, $taskId, 'sla_stale_days', $msg, ['updated_at' => $updated], 3600);
+            planner_max_enqueue_event($orgId, $uid, $taskId, 'sla_stale_days', $msg, ['updated_at' => $updated], 3600, 'sla_stale_days:' . $keyBase . $updated);
         }
     }
 }

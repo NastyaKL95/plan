@@ -66,10 +66,16 @@ function planner_mail_header_encode(string $text): string
     return '=?UTF-8?B?' . base64_encode($text) . '?=';
 }
 
+/** Адрес уходит в RCPT TO и заголовок To: пробелы, переводы строк и «<>» позволили бы дописать свои команды SMTP. */
+function planner_mail_address_ok(string $email): bool
+{
+    return $email !== '' && strpos($email, '@') !== false && !preg_match('/[\s<>,;]/u', $email);
+}
+
 function planner_send_mail(string $toEmail, string $subject, string $plainBody): bool
 {
     $toEmail = trim($toEmail);
-    if ($toEmail === '' || strpos($toEmail, '@') === false) {
+    if (!planner_mail_address_ok($toEmail)) {
         return false;
     }
     if (!planner_mail_enabled()) {
@@ -188,7 +194,7 @@ function planner_mail_queue_push(
         return false;
     }
     $toEmail = trim($toEmail);
-    if ($toEmail === '' || strpos($toEmail, '@') === false) {
+    if (!planner_mail_address_ok($toEmail)) {
         return false;
     }
     if (!planner_mail_queue_table_exists()) {

@@ -3,6 +3,10 @@ declare(strict_types=1);
 
 require __DIR__ . '/_guard.php';
 
+if (!user_may_manage_users($user)) {
+    json_response(['ok' => false, 'error' => 'forbidden'], 403);
+}
+
 $method = effective_request_method();
 if ($method !== 'POST') {
     json_response(['ok' => false, 'error' => 'method_not_allowed'], 405);
@@ -17,7 +21,7 @@ $to = trim((string) ($body['email'] ?? ''));
 if ($to === '') {
     $to = trim((string) ($user['email'] ?? ''));
 }
-if ($to === '' || strpos($to, '@') === false) {
+if ($to === '' || !planner_mail_address_ok($to)) {
     json_response(['ok' => false, 'error' => 'bad_email'], 422);
 }
 
