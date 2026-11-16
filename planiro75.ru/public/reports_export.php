@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/includes/bootstrap.php';
 require_once dirname(__DIR__) . '/includes/xlsx_simple.php';
+require_once dirname(__DIR__) . '/includes/task_extras.php';
 
 $user = require_login();
 $orgPhaseYear = isset($user['organization_work_year']) ? (int) $user['organization_work_year'] : (int) date('Y');
@@ -67,15 +68,16 @@ if ($mode === 'departments') {
         'done' => 'Выполнена',
         'cancelled' => 'Отменена',
     ];
+    $exportQp = planner_tasks_quick_privacy_fragment($user);
     if (!$hasProjectDept) {
         $sql = 'SELECT t.title, t.status, NULL AS department_name, p.name AS project_name,
                        ua.name AS assignee_name, t.due_date
                 FROM tasks t
                 LEFT JOIN projects p ON p.id = t.project_id
                 LEFT JOIN users ua ON ua.id = t.assignee_id
-                WHERE t.organization_id = ?' . $tw['sql'] . ' ORDER BY t.updated_at DESC LIMIT 5000';
+                WHERE t.organization_id = ?' . $tw['sql'] . $exportQp['sql'] . ' ORDER BY t.updated_at DESC LIMIT 5000';
         $st = db()->prepare($sql);
-        $st->execute(array_merge([$orgId], $tw['params']));
+        $st->execute(array_merge([$orgId], $tw['params'], $exportQp['params']));
     } else {
         $sql =
             'SELECT t.title, t.status, d.name AS department_name, p.name AS project_name,
@@ -84,10 +86,10 @@ if ($mode === 'departments') {
              INNER JOIN projects p ON p.id = t.project_id
              INNER JOIN departments d ON d.id = p.department_id
              LEFT JOIN users ua ON ua.id = t.assignee_id
-             WHERE t.organization_id = ?' . $scope['sql'] . $tw['sql'] . '
+             WHERE t.organization_id = ?' . $scope['sql'] . $tw['sql'] . $exportQp['sql'] . '
              ORDER BY t.updated_at DESC LIMIT 5000';
         $st = db()->prepare($sql);
-        $st->execute($baseParams);
+        $st->execute(array_merge($baseParams, $exportQp['params']));
     }
     $rows = [];
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {

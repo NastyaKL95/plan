@@ -62,6 +62,7 @@ if ($method === 'GET') {
             $it['task_count'] = $tc;
             $deleteBlock = planner_project_delete_block_reason($user, $pid, $tc);
             $it['can_delete'] = $deleteBlock === null;
+            $it['can_edit'] = user_may_manage_projects_in_department($user, (int) ($it['department_id'] ?? 0));
             $it['delete_block'] = $deleteBlock;
         }
         unset($it);
@@ -84,6 +85,9 @@ if ($method === 'GET') {
     if ($name === '') {
         json_response(['ok' => false, 'error' => 'name_required'], 422);
     }
+    if (mb_strlen($name) > 255) {
+        json_response(['ok' => false, 'error' => 'name_too_long'], 422);
+    }
     $desc = trim((string) ($body['description'] ?? ''));
     $color = trim((string) ($body['color'] ?? '#2563eb'));
     $portfolioIds = isset($body['portfolio_ids']) && is_array($body['portfolio_ids'])
@@ -104,7 +108,7 @@ if ($method === 'GET') {
         if (!$st->fetch()) {
             json_response(['ok' => false, 'error' => 'bad_department'], 422);
         }
-        if (!user_may_assign_department($user, $departmentId)) {
+        if (!user_may_manage_projects_in_department($user, $departmentId)) {
             json_response(['ok' => false, 'error' => 'forbidden_department'], 403);
         }
         if (planner_table_has_column('projects', 'work_year')) {
@@ -158,11 +162,17 @@ if ($method === 'GET') {
     if (!$chk->fetch(PDO::FETCH_ASSOC)) {
         json_response(['ok' => false, 'error' => 'not_found'], 404);
     }
+    if (!user_may_edit_project($user, $id)) {
+        json_response(['ok' => false, 'error' => 'forbidden'], 403);
+    }
 
     $body = read_json_body();
     $name = trim((string) ($body['name'] ?? ''));
     if ($name === '') {
         json_response(['ok' => false, 'error' => 'name_required'], 422);
+    }
+    if (mb_strlen($name) > 255) {
+        json_response(['ok' => false, 'error' => 'name_too_long'], 422);
     }
     $desc = trim((string) ($body['description'] ?? ''));
     $color = trim((string) ($body['color'] ?? '#2563eb'));
@@ -184,7 +194,7 @@ if ($method === 'GET') {
         if (!$st->fetch(PDO::FETCH_ASSOC)) {
             json_response(['ok' => false, 'error' => 'bad_department'], 422);
         }
-        if (!user_may_assign_department($user, $departmentId)) {
+        if (!user_may_manage_projects_in_department($user, $departmentId)) {
             json_response(['ok' => false, 'error' => 'forbidden_department'], 403);
         }
         db()->prepare('UPDATE projects SET department_id = ?, name = ?, description = ?, color = ? WHERE id = ? AND organization_id = ?')

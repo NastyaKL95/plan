@@ -201,6 +201,11 @@ if ($method === 'PATCH' || $method === 'PUT') {
 
     if (array_key_exists('department_roles', $body) && is_array($body['department_roles'])) {
         $newDepartmentRoles = [];
+        $existingRoleByDept = [];
+        foreach (planner_fetch_user_department_roles($userId) as $er) {
+            $existingRoleByDept[(int) $er['department_id']] = (string) $er['role'];
+        }
+        $rectorateIds = planner_rectorate_department_ids($orgId);
         foreach ($body['department_roles'] as $rowX) {
             if (!is_array($rowX)) {
                 continue;
@@ -213,8 +218,15 @@ if ($method === 'PATCH' || $method === 'PUT') {
             if ($rl === null) {
                 json_response(['ok' => false, 'error' => 'bad_role'], 422);
             }
-            if (in_array($rl, ['manager', 'administrator'], true) && !$mayAssignDeptRoles) {
-                json_response(['ok' => false, 'error' => 'forbidden'], 403);
+            if (!$mayAssignDeptRoles) {
+                // Свою роль руководителя можно сохранить как есть, назначить новую — только администратор.
+                if (in_array($rl, ['manager', 'administrator'], true) && ($existingRoleByDept[$did] ?? '') !== $rl) {
+                    json_response(['ok' => false, 'error' => 'forbidden'], 403);
+                }
+                // Членство в ректорате открывает всю организацию — его назначает администратор.
+                if (in_array($did, $rectorateIds, true) && !isset($existingRoleByDept[$did])) {
+                    json_response(['ok' => false, 'error' => 'forbidden_rectorate'], 403);
+                }
             }
             $newDepartmentRoles[$did] = ['department_id' => $did, 'role' => $rl];
         }

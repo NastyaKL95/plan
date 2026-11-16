@@ -99,6 +99,9 @@ if ($method === 'POST') {
     if ($name === '') {
         json_response(['ok' => false, 'error' => 'name_required'], 422);
     }
+    if (mb_strlen($name) > 255) {
+        json_response(['ok' => false, 'error' => 'name_too_long'], 422);
+    }
     $desc = trim((string) ($body['description'] ?? ''));
     $color = trim((string) ($body['color'] ?? '#0ea5e9'));
     if (!preg_match('/^#[0-9A-Fa-f]{6}$/', $color)) {
@@ -153,10 +156,17 @@ if ($method === 'POST') {
         json_response(['ok' => false, 'error' => 'not_found'], 404);
     }
 
+    if (!user_may_create_projects_and_portfolios($user)) {
+        json_response(['ok' => false, 'error' => 'forbidden'], 403);
+    }
+
     $body = read_json_body();
     $name = trim((string) ($body['name'] ?? ''));
     if ($name === '') {
         json_response(['ok' => false, 'error' => 'name_required'], 422);
+    }
+    if (mb_strlen($name) > 255) {
+        json_response(['ok' => false, 'error' => 'name_too_long'], 422);
     }
     $desc = trim((string) ($body['description'] ?? ''));
     $color = trim((string) ($body['color'] ?? '#0ea5e9'));

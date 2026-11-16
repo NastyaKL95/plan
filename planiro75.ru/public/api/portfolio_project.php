@@ -27,6 +27,9 @@ $chkProject->execute([$projectId, $orgId]);
 if (!$chkProject->fetch(PDO::FETCH_ASSOC)) {
     json_response(['ok' => false, 'error' => 'bad_project'], 422);
 }
+if (!user_may_edit_project($user, $projectId)) {
+    json_response(['ok' => false, 'error' => 'forbidden'], 403);
+}
 
 $checkPf = static function (int $id, int $orgId): bool {
     if ($id <= 0) {

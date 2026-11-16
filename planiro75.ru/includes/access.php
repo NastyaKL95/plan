@@ -303,13 +303,14 @@ function task_visible_to_user(array $user, int $taskId): bool
     }
     $hasProjectDept = planner_table_has_column('projects', 'department_id');
     $vis = planner_tasks_visibility_fragment($user, ['sql' => '', 'params' => []], $hasProjectDept);
+    $qp = planner_tasks_quick_privacy_fragment($user);
     $join = $hasProjectDept
         ? ' LEFT JOIN projects p ON p.id = t.project_id AND p.organization_id = t.organization_id '
         : '';
     $sql = 'SELECT 1 FROM tasks t' . $join
-        . ' WHERE t.organization_id = ? AND t.id = ?' . $vis['sql'] . ' LIMIT 1';
+        . ' WHERE t.organization_id = ? AND t.id = ?' . $vis['sql'] . $qp['sql'] . ' LIMIT 1';
     $st = db()->prepare($sql);
-    $st->execute(array_merge([$orgId, $taskId], $vis['params']));
+    $st->execute(array_merge([$orgId, $taskId], $vis['params'], $qp['params']));
 
     return (bool) $st->fetchColumn();
 }
@@ -324,6 +325,18 @@ function user_may_edit_task(array $user, int $taskId): bool
     $role = (string) ($user['role'] ?? '');
     if (in_array($role, ['admin', 'owner'], true)) {
         return true;
+    }
+    if (!function_exists('planner_tasks_quick_privacy_fragment')) {
+        require_once __DIR__ . '/task_extras.php';
+    }
+    // Скрытую от руководителей быструю задачу руководитель не меняет (автору и исполнителю фрагмент не мешает).
+    $qp = planner_tasks_quick_privacy_fragment($user);
+    if ($qp['sql'] !== '') {
+        $st = db()->prepare('SELECT 1 FROM tasks t WHERE t.id = ? AND t.organization_id = ?' . $qp['sql'] . ' LIMIT 1');
+        $st->execute(array_merge([$taskId, (int) ($user['organization_id'] ?? 0)], $qp['params']));
+        if (!$st->fetchColumn()) {
+            return false;
+        }
     }
     if (user_is_institute_manager($user)) {
         $orgId = (int) ($user['organization_id'] ?? 0);
@@ -647,6 +660,43 @@ function user_may_create_projects_and_portfolios(array $user): bool
     }
 
     return user_managed_department_ids($user) !== [];
+}
+
+/**
+ * Подразделение, в котором пользователь создаёт и меняет проекты: администратор и ректорат — любое,
+ * руководитель — только то, которым руководит (простое членство в отделе не в счёт).
+ */
+function user_may_manage_projects_in_department(array $user, int $departmentId): bool
+{
+    if (!user_may_create_projects_and_portfolios($user)) {
+        return false;
+    }
+    if (user_is_organization_admin($user) || user_is_institute_manager($user) || user_is_rectorate_department_member($user)) {
+        return true;
+    }
+    if ($departmentId <= 0) {
+        return false;
+    }
+    if (in_array($departmentId, user_managed_department_ids($user), true)) {
+        return true;
+    }
+
+    return ($user['role'] ?? '') === 'head' && in_array($departmentId, user_department_membership_ids($user), true);
+}
+
+/** Изменение проекта и его портфелей: проект виден и относится к подразделению, где пользователь ведёт проекты. */
+function user_may_edit_project(array $user, int $projectId): bool
+{
+    if (!user_may_create_projects_and_portfolios($user) || !project_visible_to_user($user, $projectId)) {
+        return false;
+    }
+    if (!planner_table_has_column('projects', 'department_id')) {
+        return true;
+    }
+    $st = db()->prepare('SELECT department_id FROM projects WHERE id = ? AND organization_id = ? LIMIT 1');
+    $st->execute([$projectId, (int) $user['organization_id']]);
+
+    return user_may_manage_projects_in_department($user, (int) $st->fetchColumn());
 }
 
 /** Удаление портфеля — только администратор организации. */

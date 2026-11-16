@@ -4,7 +4,7 @@ declare(strict_types=1);
 require_once dirname(__DIR__) . '/includes/bootstrap.php';
 
 $user = current_user();
-if (!$user) {
+if (!$user || planner_login_block_message($user) !== null) {
     http_response_code(403);
     header('Content-Type: text/plain; charset=utf-8');
     echo 'Доступ запрещён';

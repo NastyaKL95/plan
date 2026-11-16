@@ -65,7 +65,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
     $newDepartmentRoles = null;
     if (array_key_exists('name', $body)) {
         $n = trim((string) $body['name']);
-        if ($n === '' || strlen($n) > 120) {
+        if ($n === '' || mb_strlen($n) > 120) {
             json_response(['ok' => false, 'error' => 'bad_name'], 422);
         }
         $fields[] = 'name = ?';
@@ -73,11 +73,17 @@ if ($method === 'PATCH' || $method === 'PUT') {
     }
     if (array_key_exists('role', $body)) {
         $r = (string) $body['role'];
-        if (!in_array($r, ['member', 'admin', 'owner'], true)) {
-            json_response(['ok' => false, 'error' => 'bad_role'], 422);
+        $currentRole = (string) ($row['role'] ?? '');
+        if ($r !== $currentRole) {
+            if (!in_array($r, ['member', 'admin'], true)) {
+                json_response(['ok' => false, 'error' => 'bad_role'], 422);
+            }
+            if (in_array($currentRole, ['admin', 'owner'], true) && planner_user_is_last_org_admin($orgId, $id)) {
+                json_response(['ok' => false, 'error' => 'last_admin'], 422);
+            }
+            $fields[] = 'role = ?';
+            $params[] = $r;
         }
-        $fields[] = 'role = ?';
-        $params[] = $r;
     }
     if (array_key_exists('department_ids', $body) && is_array($body['department_ids'])) {
         $rawIds = $body['department_ids'];

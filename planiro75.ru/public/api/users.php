@@ -7,6 +7,7 @@ $method = effective_request_method();
 if ($method !== 'GET') {
     json_response(['ok' => false, 'error' => 'method_not_allowed'], 405);
 }
+$mayManageUsers = user_may_manage_users($user);
 
 $regCols = '';
 if (planner_table_has_column('users', 'account_status')) {
@@ -110,7 +111,7 @@ foreach ($items as &$it) {
     $taskCount = $taskCountsByUser[$uid] ?? 0;
     $it['task_count'] = $taskCount;
     $deleteBlock = planner_user_delete_block_reason($orgId, $userId, $uid, $taskCount, $orgAdminIds);
-    $it['can_delete'] = $deleteBlock === null;
+    $it['can_delete'] = $mayManageUsers && $deleteBlock === null;
     $it['delete_block_reason'] = $deleteBlock;
 }
 unset($it);

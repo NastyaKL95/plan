@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/_guard.php';
+require_once dirname(__DIR__, 2) . '/includes/task_extras.php';
 
 $limit = min(50, max(1, (int) ($_GET['limit'] ?? 20)));
 
@@ -17,35 +18,34 @@ $sql = 'SELECT a.id, a.action, a.entity_type, a.entity_id, a.message, a.created_
 
 $params = [$orgId];
 
-if (!user_sees_all_departments($user) && planner_table_has_column('projects', 'department_id')) {
-    if ($scopeParams === []) {
-        $sql .= ' AND 1=0';
-    } else {
-        $ph = implode(',', array_fill(0, count($scopeParams), '?'));
-        $sql .= " AND (
-            a.entity_type NOT IN ('task','project')
-            OR (a.entity_type = 'task' AND EXISTS (
-                SELECT 1 FROM tasks t
-                INNER JOIN projects p ON p.id = t.project_id
-                WHERE t.id = a.entity_id AND t.organization_id = ?
-                AND p.department_id IN ($ph)" . $tw['sql'] . "
-            ))
-            OR (a.entity_type = 'project' AND EXISTS (
-                SELECT 1 FROM projects p
-                WHERE p.id = a.entity_id AND p.organization_id = ?
-                AND p.department_id IN ($ph)" . $pw['sql'] . '
-            ))
-        )';
-        $params = array_merge(
-            $params,
-            [$orgId],
-            $scopeParams,
-            $tw['params'],
-            [$orgId],
-            $scopeParams,
-            $pw['params']
-        );
-    }
+if (!user_is_organization_admin($user)) {
+    // Задачи — по тем же правилам видимости, что и список задач; проекты — по области подразделений.
+    // Записи о пользователях, вложениях, настройках MAX и т. п. видит только администратор.
+    $hasProjectDept = planner_table_has_column('projects', 'department_id');
+    $vis = planner_tasks_visibility_fragment($user, $scope, $hasProjectDept);
+    $qp = planner_tasks_quick_privacy_fragment($user);
+    $taskJoin = $hasProjectDept ? ' LEFT JOIN projects p ON p.id = t.project_id AND p.organization_id = t.organization_id' : '';
+    $sql .= " AND (
+        a.entity_type IN ('document', 'portfolio', 'department', 'checklist_template')
+        OR (a.entity_type = 'task' AND EXISTS (
+            SELECT 1 FROM tasks t" . $taskJoin . '
+            WHERE t.id = a.entity_id AND t.organization_id = ?' . $vis['sql'] . $tw['sql'] . $qp['sql'] . "
+        ))
+        OR (a.entity_type = 'project' AND EXISTS (
+            SELECT 1 FROM projects p
+            WHERE p.id = a.entity_id AND p.organization_id = ?" . $scope['sql'] . $pw['sql'] . '
+        ))
+    )';
+    $params = array_merge(
+        $params,
+        [$orgId],
+        $vis['params'],
+        $tw['params'],
+        $qp['params'],
+        [$orgId],
+        $scopeParams,
+        $pw['params']
+    );
 }
 
 $sql .= ' ORDER BY a.id DESC LIMIT ' . $limit;

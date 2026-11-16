@@ -97,6 +97,7 @@ $stuckRef = planner_table_has_column('tasks', 'status_changed_at')
     : 't.updated_at';
 
 $stuckTasks = [];
+$stuckQp = planner_tasks_quick_privacy_fragment($user);
 if (!$hasProjectDept) {
     $st = db()->prepare(
         "SELECT t.id, t.title, t.status, t.assignee_id, ua.name AS assignee_name, t.updated_at,
@@ -105,11 +106,11 @@ if (!$hasProjectDept) {
          LEFT JOIN users ua ON ua.id = t.assignee_id
          WHERE t.organization_id = ?
            AND t.status NOT IN ('done','cancelled')
-           AND $stuckRef < DATE_SUB(NOW(), INTERVAL 14 DAY)" . $tw['sql'] . "
+           AND $stuckRef < DATE_SUB(NOW(), INTERVAL 14 DAY)" . $tw['sql'] . $stuckQp['sql'] . "
          ORDER BY $stuckRef ASC
          LIMIT 30"
     );
-    planner_reports_exec($st, array_merge([$orgId], $tw['params']), 'reports.stuck');
+    planner_reports_exec($st, array_merge([$orgId], $tw['params'], $stuckQp['params']), 'reports.stuck');
 } else {
     $st = db()->prepare(
         "SELECT t.id, t.title, t.status, t.assignee_id, ua.name AS assignee_name, t.updated_at,
@@ -119,11 +120,11 @@ if (!$hasProjectDept) {
          LEFT JOIN users ua ON ua.id = t.assignee_id
          WHERE t.organization_id = ?
            AND t.status NOT IN ('done','cancelled')
-           AND $stuckRef < DATE_SUB(NOW(), INTERVAL 14 DAY)" . $scope['sql'] . $tw['sql'] . "
+           AND $stuckRef < DATE_SUB(NOW(), INTERVAL 14 DAY)" . $scope['sql'] . $tw['sql'] . $stuckQp['sql'] . "
          ORDER BY $stuckRef ASC
          LIMIT 30"
     );
-    planner_reports_exec($st, $baseParams, 'reports.stuck');
+    planner_reports_exec($st, array_merge($baseParams, $stuckQp['params']), 'reports.stuck');
 }
 $stuckTasks = $st->fetchAll(PDO::FETCH_ASSOC);
 

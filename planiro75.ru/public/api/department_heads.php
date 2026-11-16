@@ -46,15 +46,15 @@ if ($method === 'DELETE') {
     if ($departmentId <= 0 || $headUserId <= 0) {
         json_response(['ok' => false, 'error' => 'bad_params'], 422);
     }
-    $st = db()->prepare(
-        'DELETE FROM department_heads WHERE user_id = ? AND department_id = ?'
-    );
-    $st->execute([$headUserId, $departmentId]);
     $st = db()->prepare('SELECT id FROM departments WHERE id = ? AND organization_id = ? LIMIT 1');
     $st->execute([$departmentId, $orgId]);
     if (!$st->fetch()) {
         json_response(['ok' => false, 'error' => 'not_found'], 404);
     }
+    $st = db()->prepare(
+        'DELETE FROM department_heads WHERE user_id = ? AND department_id = ?'
+    );
+    $st->execute([$headUserId, $departmentId]);
     log_activity($orgId, $userId, 'unassign', 'department_head', $departmentId, 'Снят руководитель подразделения');
     json_response(['ok' => true]);
 }
