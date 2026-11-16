@@ -246,14 +246,6 @@
     return typeof window.__PLANNER_USER_NAME__ === 'string' ? window.__PLANNER_USER_NAME__ : '';
   }
 
-  function userPickerLabel(u) {
-    var name = u.name || '';
-    if (u.account_status === 'blocked' || u.is_blocked) {
-      return name + ' (заблокирован)';
-    }
-    return name;
-  }
-
 
   function setModalDensity(mode) {
     var card = document.querySelector('.task-modal-card');

@@ -65,7 +65,7 @@
         btn.addEventListener('click', function () {
           var id = parseInt(btn.getAttribute('data-id'), 10);
           api('/api/notifications.php', { method: 'PATCH', body: { id: id } })
-            .then(load)
+            .then(changed)
             .catch(function (e) {
               notify(e.message || '', 'error');
             });
@@ -117,13 +117,18 @@
       });
   }
 
+  function changed() {
+    window.dispatchEvent(new Event('planner:notifications-changed'));
+    return load();
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     load();
     var b = $('btnMarkAllRead');
     if (b) {
       b.addEventListener('click', function () {
         api('/api/notifications.php', { method: 'POST', body: { mark_all: true } })
-          .then(load)
+          .then(changed)
           .catch(function (e) {
             notify(e.message || '', 'error');
           });

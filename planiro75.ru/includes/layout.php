@@ -114,7 +114,7 @@ function layout_start(array $user, string $title, string $active = 'dashboard'):
       <div class="bx-topnav-actions">
         <a class="bx-topnav-notif" href="<?= htmlspecialchars(planner_url('/notifications.php'), ENT_QUOTES, 'UTF-8') ?>" title="Уведомления" aria-label="Уведомления">
           <img class="bx-topnav-notif-icon" src="<?= htmlspecialchars(planner_url('/assets/img/notification-bell.png'), ENT_QUOTES, 'UTF-8') ?>" alt="" aria-hidden="true">
-          <span class="bx-rail-badge" id="bxNotifBadge">0</span>
+          <span class="bx-rail-badge" id="bxNotifBadge" hidden></span>
         </a>
       </div>
       <time class="bx-clock" id="bxClock" datetime="">—:—</time>
