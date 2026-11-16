@@ -1937,7 +1937,7 @@ function planner_notify_max_task_assigned(int $orgId, int $taskId, int $assignee
         return;
     }
     $st = db()->prepare(
-        'SELECT t.title, p.name AS project_name, au.name AS actor_name
+        'SELECT t.title, t.status, p.name AS project_name, au.name AS actor_name
          FROM tasks t
          LEFT JOIN projects p ON p.id = t.project_id
          LEFT JOIN users au ON au.id = ?
@@ -1963,9 +1963,15 @@ function planner_notify_max_task_assigned(int $orgId, int $taskId, int $assignee
         planner_public_task_link($taskId),
         '👤'
     );
+    // Ссылки только на допустимые переходы: из «Новой» сразу в «Выполнена» нельзя, уже начатую не «берут в работу».
+    $statusNow = (string) ($row['status'] ?? 'new');
     $openTok = planner_max_create_action_token($orgId, $assigneeId, $taskId, 'open');
-    $takeTok = planner_max_create_action_token($orgId, $assigneeId, $taskId, 'take');
-    $doneTok = planner_max_create_action_token($orgId, $assigneeId, $taskId, 'done');
+    $takeTok = in_array($statusNow, ['new', 'cancelled'], true)
+        ? planner_max_create_action_token($orgId, $assigneeId, $taskId, 'take')
+        : [];
+    $doneTok = in_array($statusNow, ['in_progress', 'review'], true)
+        ? planner_max_create_action_token($orgId, $assigneeId, $taskId, 'done')
+        : [];
     if ($openTok !== []) {
         $msg .= "\n🔗 Открыть: " . planner_public_site_url('/max_action.php?token=' . rawurlencode((string) $openTok['token']));
     }

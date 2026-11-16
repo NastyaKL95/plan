@@ -85,7 +85,7 @@ layout_start($user, 'Профиль', 'dashboard');
         <input type="number" id="pfMaxDigestMinutes" class="input-inline pf-max-inline-sm" min="15" max="1440" step="5" value="60" placeholder="минут">
       </div>
       <div class="pf-max-row pf-max-row--with-input">
-        <label class="bx-check-row"><input type="checkbox" id="pfMaxQuietMode"> Тихий режим (для некритичных)</label>
+        <label class="bx-check-row"><input type="checkbox" id="pfMaxQuietMode"> Тихий режим для некритичных, время читинское</label>
         <input type="text" id="pfMaxQuietStart" class="input-inline pf-max-inline-xs" placeholder="20:00">
         <input type="text" id="pfMaxQuietEnd" class="input-inline pf-max-inline-xs" placeholder="08:00">
       </div>
