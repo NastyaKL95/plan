@@ -95,10 +95,10 @@ function planner_my_plan_migrate_legacy_for_user(int $orgId, int $userId): void
     );
     $st->execute([$orgId, $userId, $userId]);
     $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    // Переносим только задачи без размещения: иначе каждое открытие плана возвращало бы карточки в колонку старой «полосы».
     $up = db()->prepare(
-        'INSERT INTO task_my_plan_placement (organization_id, task_id, user_id, stage_id)
-         VALUES (?,?,?,?)
-         ON DUPLICATE KEY UPDATE stage_id = VALUES(stage_id), organization_id = VALUES(organization_id)'
+        'INSERT IGNORE INTO task_my_plan_placement (organization_id, task_id, user_id, stage_id)
+         VALUES (?,?,?,?)'
     );
     foreach ($rows as $r) {
         $tid = (int) ($r['id'] ?? 0);

@@ -2,6 +2,8 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/includes/bootstrap.php';
+require_once dirname(__DIR__) . '/includes/task_extras.php';
+require_once dirname(__DIR__) . '/includes/max_notify.php';
 
 $token = trim((string) ($_REQUEST['token'] ?? ''));
 if ($token === '' || !planner_table_exists('max_action_tokens')) {
@@ -34,6 +36,9 @@ $action = trim((string) ($row['action'] ?? ''));
 if (planner_maintenance_blocks_user_id($orgId, $userId)) {
     planner_maintenance_render_page($orgId, false);
 }
+if (planner_user_is_blocked_id($orgId, $userId)) {
+    planner_max_action_page('Доступ закрыт', 'Учётная запись заблокирована или ещё не подтверждена.', 403);
+}
 
 if ($action === 'open') {
     db()->prepare('UPDATE max_action_tokens SET used_at = NOW() WHERE token = ? AND used_at IS NULL')->execute([$token]);
@@ -45,7 +50,7 @@ if ($action !== 'take' && $action !== 'done') {
     planner_max_action_page('Неизвестное действие', 'Эта ссылка не поддерживается.');
 }
 
-$taskSt = db()->prepare('SELECT title, status FROM tasks WHERE id = ? AND organization_id = ? LIMIT 1');
+$taskSt = db()->prepare('SELECT * FROM tasks WHERE id = ? AND organization_id = ? LIMIT 1');
 $taskSt->execute([$taskId, $orgId]);
 $task = $taskSt->fetch(PDO::FETCH_ASSOC);
 if (!$task) {
@@ -57,6 +62,20 @@ $title = trim((string) ($task['title'] ?? ''));
 if ($title === '') {
     $title = 'Задача #' . $taskId;
 }
+$assigneeNow = (int) ($task['assignee_id'] ?? 0);
+if ($assigneeNow !== 0 && $assigneeNow !== $userId) {
+    db()->prepare('UPDATE max_action_tokens SET used_at = NOW() WHERE token = ? AND used_at IS NULL')->execute([$token]);
+    planner_max_action_page('Задача передана другому исполнителю', 'Изменить её статус по этой ссылке уже нельзя.');
+}
+$fromStatus = (string) ($task['status'] ?? '');
+$toStatus = $action === 'take' ? 'in_progress' : 'done';
+if ($fromStatus === $toStatus) {
+    db()->prepare('UPDATE max_action_tokens SET used_at = NOW() WHERE token = ? AND used_at IS NULL')->execute([$token]);
+    planner_max_action_page('Статус уже установлен', 'Задача «' . $title . '» уже ' . ($toStatus === 'done' ? 'выполнена.' : 'в работе.'));
+}
+if (!planner_task_status_transition_allowed($fromStatus, $toStatus)) {
+    planner_max_action_page('Действие недоступно', 'Из текущего статуса задачу так перевести нельзя. Откройте её в планировщике.');
+}
 $question = $action === 'take'
     ? 'Взять задачу в работу?'
     : 'Отметить задачу выполненной?';
@@ -66,11 +85,23 @@ $doneText = $action === 'take'
 
 $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 if ($method === 'POST' && (string) ($_POST['confirm'] ?? '') === '1') {
-    $status = $action === 'take' ? 'in_progress' : 'done';
-    db()->prepare(
-        'UPDATE tasks SET status = ?, assignee_id = ?, updated_at = NOW() WHERE id = ? AND organization_id = ?'
-    )->execute([$status, $userId, $taskId, $orgId]);
-    db()->prepare('UPDATE max_action_tokens SET used_at = NOW() WHERE token = ? AND used_at IS NULL')->execute([$token]);
+    $claim = db()->prepare('UPDATE max_action_tokens SET used_at = NOW() WHERE token = ? AND used_at IS NULL');
+    $claim->execute([$token]);
+    if ($claim->rowCount() === 0) {
+        planner_max_action_page('Ссылка уже использована', 'Это действие уже выполнено.');
+    }
+    $set = 'status = ?, assignee_id = COALESCE(assignee_id, ?), updated_at = NOW()';
+    if (planner_table_has_column('tasks', 'status_changed_at')) {
+        $set .= ', status_changed_at = NOW()';
+    }
+    db()->prepare('UPDATE tasks SET ' . $set . ' WHERE id = ? AND organization_id = ?')
+        ->execute([$toStatus, $userId, $taskId, $orgId]);
+    log_activity($orgId, $userId, 'update', 'task', $taskId, 'Статус «' . $toStatus . '» (из MAX)');
+    planner_run_task_automation_rules($orgId, $userId, $taskId, $toStatus, (int) ($task['project_id'] ?? 0) ?: null);
+    if ($toStatus === 'done' && in_array((string) ($task['recurrence'] ?? ''), ['weekly', 'monthly'], true)) {
+        planner_clone_recurring_followup($orgId, $userId, $task);
+    }
+    planner_notify_max_task_status_changed($orgId, $taskId, $fromStatus, $toStatus, $userId);
     planner_max_action_page('Готово', $doneText . ' «' . $title . '».');
 }
 

@@ -8,25 +8,6 @@ require_once dirname(__DIR__, 2) . '/includes/my_plan_stages.php';
 require_once dirname(__DIR__, 2) . '/includes/teacher_report.php';
 planner_teacher_report_ensure_schema();
 
-/**
- * Валидные переходы статусов задачи.
- * Небольшая гибкость сохранена для "переоткрытия" done/cancelled.
- */
-function planner_task_status_transition_allowed(string $from, string $to): bool
-{
-    if ($from === $to) {
-        return true;
-    }
-    $allowed = [
-        'new' => ['in_progress', 'cancelled'],
-        'in_progress' => ['new', 'review', 'done', 'cancelled'],
-        'review' => ['in_progress', 'done', 'cancelled'],
-        'done' => ['in_progress', 'cancelled'],
-        'cancelled' => ['new', 'in_progress'],
-    ];
-    return in_array($to, $allowed[$from] ?? [], true);
-}
-
 $id = (int) ($_GET['id'] ?? 0);
 if ($id <= 0) {
     json_response(['ok' => false, 'error' => 'bad_id'], 422);
@@ -218,6 +199,9 @@ if ($method === 'PATCH' || $method === 'PUT') {
         if ($t === '') {
             json_response(['ok' => false, 'error' => 'title_empty'], 422);
         }
+        if (mb_strlen($t) > 500) {
+            json_response(['ok' => false, 'error' => 'title_too_long'], 422);
+        }
         $fields[] = 'title = ?';
         $params[] = $t;
     }
@@ -312,13 +296,16 @@ if ($method === 'PATCH' || $method === 'PUT') {
     }
     if (array_key_exists('due_date', $body)) {
         $due = planner_parse_due_datetime_input($body['due_date'], planner_org_default_due_time_hms($orgId));
+        if ($due === null && is_string($body['due_date']) && trim($body['due_date']) !== '') {
+            json_response(['ok' => false, 'error' => 'bad_due_date'], 422);
+        }
         $fields[] = 'due_date = ?';
         $params[] = $due;
     }
     if (planner_table_has_column('tasks', 'remind_at') && array_key_exists('remind_at', $body)) {
         $r = $body['remind_at'];
         $rem = null;
-        if (is_string($r) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $r)) {
+        if (is_string($r) && planner_is_valid_ymd($r)) {
             $rem = $r;
         }
         $fields[] = 'remind_at = ?';
@@ -454,6 +441,12 @@ if ($method === 'PATCH' || $method === 'PUT') {
             : null;
         if ($newStatus !== $beforeStatus) {
             planner_run_task_automation_rules($orgId, $userId, $id, $newStatus, $projAfter > 0 ? $projAfter : null);
+            // Правило автоматизации могло сменить исполнителя — уведомляем того, кто назначен в итоге.
+            $stAfter->execute([$id, $orgId]);
+            $rowAuto = $stAfter->fetch(PDO::FETCH_ASSOC);
+            if ($rowAuto) {
+                $afterAssigneeId = isset($rowAuto['assignee_id']) ? (int) $rowAuto['assignee_id'] : 0;
+            }
         }
         if (
             $statusBecameDone
@@ -501,8 +494,22 @@ if ($method === 'DELETE') {
     if (!user_may_delete_task($user, $id)) {
         json_response(['ok' => false, 'error' => 'forbidden_delete'], 403);
     }
-    $st = db()->prepare('DELETE FROM tasks WHERE id = ? AND organization_id = ?');
-    $st->execute([$id, $orgId]);
+    $files = [];
+    db()->beginTransaction();
+    try {
+        $files = planner_task_delete_dependents($orgId, $id);
+        $st = db()->prepare('DELETE FROM tasks WHERE id = ? AND organization_id = ?');
+        $st->execute([$id, $orgId]);
+        db()->commit();
+    } catch (Throwable $e) {
+        if (db()->inTransaction()) {
+            db()->rollBack();
+        }
+        throw $e;
+    }
+    foreach ($files as $path) {
+        @unlink($path);
+    }
     log_activity($orgId, $userId, 'delete', 'task', $id, 'Удалена задача');
     json_response(['ok' => true]);
 }

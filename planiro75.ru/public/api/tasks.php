@@ -301,6 +301,9 @@ if ($method === 'POST') {
     if ($title === '') {
         json_response(['ok' => false, 'error' => 'title_required'], 422);
     }
+    if (mb_strlen($title) > 500) {
+        json_response(['ok' => false, 'error' => 'title_too_long'], 422);
+    }
     $description = isset($body['description']) ? (string) $body['description'] : null;
     if ($description === null && $tpl && isset($tpl['description'])) {
         $description = (string) $tpl['description'];
@@ -374,10 +377,13 @@ if ($method === 'POST') {
     }
     $due = $body['due_date'] ?? null;
     $dueDate = planner_parse_due_datetime_input($due, planner_org_default_due_time_hms($orgId));
+    if ($dueDate === null && is_string($due) && trim($due) !== '') {
+        json_response(['ok' => false, 'error' => 'bad_due_date'], 422);
+    }
     $remindDate = null;
     if (planner_table_has_column('tasks', 'remind_at')) {
         $r = $body['remind_at'] ?? null;
-        if (is_string($r) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $r)) {
+        if (is_string($r) && planner_is_valid_ymd($r)) {
             $remindDate = $r;
         }
     }

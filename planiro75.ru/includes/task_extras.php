@@ -29,6 +29,71 @@ function planner_sync_task_tags(int $orgId, int $taskId, array $tagIds): void
     }
 }
 
+/**
+ * Валидные переходы статусов задачи.
+ * Небольшая гибкость сохранена для "переоткрытия" done/cancelled.
+ */
+function planner_task_status_transition_allowed(string $from, string $to): bool
+{
+    if ($from === $to) {
+        return true;
+    }
+    $allowed = [
+        'new' => ['in_progress', 'cancelled'],
+        'in_progress' => ['new', 'review', 'done', 'cancelled'],
+        'review' => ['in_progress', 'done', 'cancelled'],
+        'done' => ['in_progress', 'cancelled'],
+        'cancelled' => ['new', 'in_progress'],
+    ];
+    return in_array($to, $allowed[$from] ?? [], true);
+}
+
+/**
+ * Удаляет строки, привязанные к задаче. Внешних ключей в рабочей базе нет, поэтому без этого
+ * остаются осиротевшие подзадачи, комментарии, вложения и размещения в «Моём плане».
+ *
+ * @return list<string> пути файлов вложений — удалить с диска после фиксации транзакции
+ */
+function planner_task_delete_dependents(int $orgId, int $taskId): array
+{
+    $pdo = db();
+    $run = static function (string $table, string $sql, array $params) use ($pdo): void {
+        if (planner_table_exists($table)) {
+            $pdo->prepare($sql)->execute($params);
+        }
+    };
+    $files = [];
+    if (planner_table_exists('task_attachments')) {
+        $st = $pdo->prepare('SELECT stored_name FROM task_attachments WHERE task_id = ? AND organization_id = ?');
+        $st->execute([$taskId, $orgId]);
+        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $stored) {
+            if ((string) $stored !== '') {
+                $files[] = planner_upload_root() . '/' . $orgId . '/' . (string) $stored;
+            }
+        }
+    }
+    if (planner_table_exists('task_comments')) {
+        $commentIds = 'SELECT c.id FROM task_comments c WHERE c.task_id = ?';
+        $run('task_comment_reads', "DELETE FROM task_comment_reads WHERE comment_id IN ($commentIds)", [$taskId]);
+        $run('task_comment_mentions', "DELETE FROM task_comment_mentions WHERE comment_id IN ($commentIds)", [$taskId]);
+    }
+    if (planner_table_exists('subtasks')) {
+        $run('subtask_participants', 'DELETE FROM subtask_participants WHERE subtask_id IN (SELECT s.id FROM subtasks s WHERE s.task_id = ?)', [$taskId]);
+    }
+    $run('task_attachments', 'DELETE FROM task_attachments WHERE task_id = ? AND organization_id = ?', [$taskId, $orgId]);
+    $run('task_comments', 'DELETE FROM task_comments WHERE task_id = ?', [$taskId]);
+    $run('subtasks', 'DELETE FROM subtasks WHERE task_id = ?', [$taskId]);
+    $run('task_links', 'DELETE FROM task_links WHERE task_id = ? OR linked_task_id = ?', [$taskId, $taskId]);
+    $run('task_participants', 'DELETE FROM task_participants WHERE task_id = ?', [$taskId]);
+    $run('task_tag_map', 'DELETE FROM task_tag_map WHERE task_id = ?', [$taskId]);
+    $run('task_my_plan_placement', 'DELETE FROM task_my_plan_placement WHERE task_id = ?', [$taskId]);
+    $run('notifications', 'DELETE FROM notifications WHERE task_id = ? AND organization_id = ?', [$taskId, $orgId]);
+    $run('max_action_tokens', 'DELETE FROM max_action_tokens WHERE task_id = ?', [$taskId]);
+    $run('max_digest_queue', 'DELETE FROM max_digest_queue WHERE task_id = ?', [$taskId]);
+
+    return $files;
+}
+
 /** @return array{id:int,title:string,status:string,priority:string}|null */
 function planner_task_brief(int $orgId, int $taskId): ?array
 {
@@ -45,13 +110,13 @@ function planner_clone_recurring_followup(int $orgId, int $userId, array $doneTa
     $remind = $doneTask['remind_at'] ?? null;
     $newDue = null;
     $newRemind = null;
-    if (is_string($due) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $due)) {
+    if (is_string($due) && preg_match('/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?$/', $due)) {
         $sql = $rec === 'monthly' ? 'SELECT DATE_ADD(?, INTERVAL 1 MONTH)' : 'SELECT DATE_ADD(?, INTERVAL 1 WEEK)';
         $st = db()->prepare($sql);
         $st->execute([$due]);
         $newDue = $st->fetchColumn() ?: null;
     }
-    if (is_string($remind) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $remind)) {
+    if (is_string($remind) && preg_match('/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?$/', $remind)) {
         $sql = $rec === 'monthly' ? 'SELECT DATE_ADD(?, INTERVAL 1 MONTH)' : 'SELECT DATE_ADD(?, INTERVAL 1 WEEK)';
         $st = db()->prepare($sql);
         $st->execute([$remind]);
@@ -365,6 +430,9 @@ function planner_parse_due_datetime_input(mixed $due, ?string $dateOnlyDefaultHm
     }
     $due = trim(str_replace('T', ' ', $due));
     if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $due)) {
+        if (!planner_is_valid_ymd($due)) {
+            return null;
+        }
         $t = $dateOnlyDefaultHms !== null && $dateOnlyDefaultHms !== ''
             ? planner_normalize_due_time_hm($dateOnlyDefaultHms)
             : '23:59:59';
@@ -373,11 +441,24 @@ function planner_parse_due_datetime_input(mixed $due, ?string $dateOnlyDefaultHm
     }
     if (preg_match('/^(\d{4}-\d{2}-\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?/', $due, $m)) {
         $sec = isset($m[4]) && $m[4] !== '' ? $m[4] : '00';
+        if (!planner_is_valid_ymd($m[1]) || (int) $m[2] > 23 || (int) $m[3] > 59 || (int) $sec > 59) {
+            return null;
+        }
 
         return $m[1] . ' ' . $m[2] . ':' . $m[3] . ':' . $sec;
     }
 
     return null;
+}
+
+/** Календарная дата ГГГГ-ММ-ДД, которую примет MySQL (без 31 февраля и 13-го месяца). */
+function planner_is_valid_ymd(string $ymd): bool
+{
+    if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $ymd, $m)) {
+        return false;
+    }
+
+    return (int) $m[1] >= 1900 && checkdate((int) $m[2], (int) $m[3], (int) $m[1]);
 }
 
 /**
