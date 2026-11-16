@@ -145,9 +145,16 @@ function planner_document_snippet(string $text, array $words, int $radius = 90):
 function planner_document_search_words(string $q): array
 {
     $q = mb_substr(trim($q), 0, 200);
-    $words = preg_split('/\s+/u', $q, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    $words = [];
+    foreach (preg_split('/\s+/u', $q, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $w) {
+        // «№45-од» и «№ 45-од» ищут номер «45-од»: знак номера в поле обычно не хранится.
+        $w = ltrim($w, '№#');
+        if ($w !== '' && !in_array(mb_strtolower($w), array_map('mb_strtolower', $words), true)) {
+            $words[] = $w;
+        }
+    }
 
-    return array_values(array_slice(array_unique($words), 0, 8));
+    return array_slice($words, 0, 8);
 }
 
 function planner_document_public(array $row, bool $mayManage): array
@@ -245,8 +252,10 @@ function planner_document_fields_from_request(int $orgId, array $in): array
         return [[], 'title_required'];
     }
     $date = trim((string) ($in['doc_date'] ?? ''));
-    if ($date !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-        return [[], 'bad_date'];
+    if ($date !== '') {
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m) || !checkdate((int) $m[2], (int) $m[3], (int) $m[1]) || (int) $m[1] < 1900) {
+            return [[], 'bad_date'];
+        }
     }
     $deptId = (int) ($in['department_id'] ?? 0);
     if ($deptId > 0) {
@@ -257,13 +266,15 @@ function planner_document_fields_from_request(int $orgId, array $in): array
         }
     }
     $flag = static fn($v): int => in_array($v, [true, 1, '1', 'true', 'on'], true) ? 1 : 0;
+    $number = mb_substr(trim((string) ($in['doc_number'] ?? '')), 0, 60);
+    $description = mb_substr(trim((string) ($in['description'] ?? '')), 0, 5000);
 
     return [[
         'doc_type' => $type,
         'title' => mb_substr($title, 0, 500),
-        'doc_number' => mb_substr(trim((string) ($in['doc_number'] ?? '')), 0, 60) ?: null,
+        'doc_number' => $number !== '' ? $number : null,
         'doc_date' => $date !== '' ? $date : null,
-        'description' => mb_substr(trim((string) ($in['description'] ?? '')), 0, 5000) ?: null,
+        'description' => $description !== '' ? $description : null,
         'department_id' => $deptId > 0 ? $deptId : null,
         'is_active' => array_key_exists('is_active', $in) ? $flag($in['is_active']) : 1,
         'is_pinned' => $flag($in['is_pinned'] ?? 0),

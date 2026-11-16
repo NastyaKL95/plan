@@ -28,11 +28,16 @@ if ($method === 'POST') {
                                 original_name, stored_name, mime, size_bytes, content_text, uploaded_by)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
     );
-    $st->execute([
-        $orgId, $fields['doc_type'], $fields['title'], $fields['doc_number'], $fields['doc_date'], $fields['description'],
-        $fields['department_id'], $fields['is_active'], $fields['is_pinned'],
-        $file['original_name'], $file['stored_name'], $file['mime'], $file['size_bytes'], $file['content_text'] ?: null, $userId,
-    ]);
+    try {
+        $st->execute([
+            $orgId, $fields['doc_type'], $fields['title'], $fields['doc_number'], $fields['doc_date'], $fields['description'],
+            $fields['department_id'], $fields['is_active'], $fields['is_pinned'],
+            $file['original_name'], $file['stored_name'], $file['mime'], $file['size_bytes'], $file['content_text'] ?: null, $userId,
+        ]);
+    } catch (Throwable $e) {
+        @unlink(planner_document_path($orgId, $file['stored_name']));
+        throw $e;
+    }
     $id = (int) db()->lastInsertId();
     log_activity($orgId, $userId, 'create', 'document', $id, 'Документ: ' . $fields['title']);
     json_response(['ok' => true, 'id' => $id]);
@@ -93,14 +98,16 @@ if ($type !== '') {
 
 $order = match ($sort) {
     'date_asc' => 'd.doc_date IS NULL, d.doc_date ASC, d.id ASC',
-    'title' => 'd.title ASC',
+    'title' => 'd.title ASC, d.id ASC',
     'recent' => 'd.updated_at DESC, d.id DESC',
     default => 'd.doc_date IS NULL, d.doc_date DESC, d.id DESC',
 };
 $relevance = '';
-if ($words) {
-    $relevance = '(d.title LIKE ?) DESC, ';
-    $listParams[] = '%' . addcslashes($words[0], '%_\\') . '%';
+if ($words && $sort === 'date_desc') {
+    $relevance = '(' . implode(' + ', array_fill(0, count($words), '(d.title LIKE ?)')) . ') DESC, ';
+    foreach ($words as $w) {
+        $listParams[] = '%' . addcslashes($w, '%_\\') . '%';
+    }
 }
 $contentSel = $words ? ', d.content_text' : '';
 $st = db()->prepare(

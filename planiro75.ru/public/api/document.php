@@ -41,7 +41,7 @@ if ($method === 'POST' || $method === 'PATCH') {
         $in = json_decode((string) file_get_contents('php://input'), true) ?: [];
     }
     if (!empty($in['pin_only'])) {
-        $pinned = in_array($in['is_pinned'], [true, 1, '1', 'true'], true) ? 1 : 0;
+        $pinned = in_array($in['is_pinned'] ?? 0, [true, 1, '1', 'true'], true) ? 1 : 0;
         db()->prepare('UPDATE documents SET is_pinned = ? WHERE id = ? AND organization_id = ?')->execute([$pinned, $id, $orgId]);
         json_response(['ok' => true]);
     }
@@ -70,7 +70,14 @@ if ($method === 'POST' || $method === 'PATCH') {
     }
     $params[] = $id;
     $params[] = $orgId;
-    db()->prepare('UPDATE documents SET ' . implode(', ', $sets) . ' WHERE id = ? AND organization_id = ?')->execute($params);
+    try {
+        db()->prepare('UPDATE documents SET ' . implode(', ', $sets) . ' WHERE id = ? AND organization_id = ?')->execute($params);
+    } catch (Throwable $e) {
+        if ($newFile) {
+            @unlink(planner_document_path($orgId, $newFile['stored_name']));
+        }
+        throw $e;
+    }
     if ($newFile) {
         @unlink(planner_document_path($orgId, (string) $doc['stored_name']));
     }

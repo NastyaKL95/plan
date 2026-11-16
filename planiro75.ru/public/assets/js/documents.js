@@ -29,6 +29,7 @@
       if (p.has(k)) state[k] = p.get(k) || '';
     });
     if (!cfg.types[state.type]) state.type = '';
+    state.q = state.q.trim();
     if (['active', 'inactive', 'all'].indexOf(state.status) < 0) state.status = 'active';
   }
 
@@ -101,15 +102,21 @@
       sel.setAttribute('data-html', html);
     }
     sel.value = years.indexOf(parseInt(cur, 10)) >= 0 ? cur : '';
+    if (cur && !sel.value) setState({ year: '' });
     if (window.bxCustomSelectSync) window.bxCustomSelectSync(sel);
   }
 
   function highlight(text) {
-    var out = esc(text);
-    if (!words.length) return out;
-    var parts = words.map(function (w) { return esc(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).filter(Boolean);
-    if (!parts.length) return out;
-    return out.replace(new RegExp('(' + parts.join('|') + ')', 'gi'), '<mark>$1</mark>');
+    text = String(text == null ? '' : text);
+    var parts = words
+      .filter(Boolean)
+      .sort(function (a, b) { return b.length - a.length; })
+      .map(function (w) { return w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); });
+    if (!parts.length) return esc(text);
+    // Подсвечиваем по исходному тексту и экранируем каждый кусок: иначе слова вроде «amp» ломают сущности HTML.
+    return text.split(new RegExp('(' + parts.join('|') + ')', 'gi')).map(function (seg, i) {
+      return i % 2 ? '<mark>' + esc(seg) + '</mark>' : esc(seg);
+    }).join('');
   }
 
   function fmtDate(iso) {
@@ -163,8 +170,8 @@
     if (d.uploaded_by_name) foot.push('добавил(а) ' + esc(d.uploaded_by_name) + ' ' + fmtDate(d.created_at));
     var openHref = fileUrl(d, d.can_view_inline);
     var actions =
-      (d.can_view_inline ? '<a class="doc-btn" href="' + fileUrl(d, true) + '" target="_blank" rel="noopener">' + ICON_EYE + '<span>Открыть</span></a>' : '') +
-      '<a class="doc-btn" href="' + fileUrl(d, false) + '">' + ICON_DL + '<span>Скачать</span></a>' +
+      (d.can_view_inline ? '<a class="doc-btn" href="' + fileUrl(d, true) + '" target="_blank" rel="noopener" title="Открыть в браузере">' + ICON_EYE + '<span>Открыть</span></a>' : '') +
+      '<a class="doc-btn" href="' + fileUrl(d, false) + '" title="Скачать файл">' + ICON_DL + '<span>Скачать</span></a>' +
       '<button type="button" class="doc-btn doc-btn--icon" data-act="link" title="Скопировать ссылку">' + ICON_LINK + '</button>' +
       (cfg.mayManage
         ? '<button type="button" class="doc-btn doc-btn--icon' + (d.is_pinned ? ' is-on' : '') + '" data-act="pin" title="' + (d.is_pinned ? 'Открепить' : 'Закрепить вверху') + '">' + ICON_PIN + '</button>' +
@@ -221,16 +228,21 @@
   // Фильтры
   var searchTimer = null;
   $('docSearch').addEventListener('input', function () {
-    var v = this.value;
     clearTimeout(searchTimer);
     searchTimer = setTimeout(function () {
-      if (v.trim() !== state.q.trim()) setState({ q: v.trim() });
+      var v = $('docSearch').value.trim();
+      if (v !== state.q) setState({ q: v });
     }, 250);
   });
   $('docSearch').addEventListener('keydown', function (ev) {
-    if (ev.key === 'Escape' && this.value) {
+    if (ev.key === 'Enter') {
+      clearTimeout(searchTimer);
+      var v = this.value.trim();
+      if (v !== state.q) setState({ q: v });
+    } else if (ev.key === 'Escape' && this.value) {
+      clearTimeout(searchTimer);
       this.value = '';
-      setState({ q: '' });
+      if (state.q) setState({ q: '' });
     }
   });
   document.addEventListener('keydown', function (ev) {
@@ -252,6 +264,7 @@
   $('docYear').addEventListener('change', function () { setState({ year: this.value }); });
   $('docSort').addEventListener('change', function () { setState({ sort: this.value }); });
   function resetFilters() {
+    clearTimeout(searchTimer);
     setState({ type: '', q: '', dept: '', year: '', status: 'active', sort: 'date_desc' });
   }
   $('docReset').addEventListener('click', resetFilters);
