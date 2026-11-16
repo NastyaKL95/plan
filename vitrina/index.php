@@ -4,6 +4,20 @@ declare(strict_types=1);
 require __DIR__ . '/lib/events.php';
 
 $cfg = vitrina_config();
+$themes = ['eco' => 'Экосистема', 'flag' => 'Цвета флага края'];
+$theme = (string) ($_GET['theme'] ?? $cfg['theme']);
+if (!isset($themes[$theme])) {
+    $theme = 'eco';
+}
+$favicon = $theme === 'flag' ? 'assets/favicon-flag.svg' : 'assets/favicon.svg';
+$themeUrl = static function (string $t) use ($cfg): string {
+    $q = $_GET;
+    unset($q['theme']);
+    if ($t !== $cfg['theme']) {
+        $q['theme'] = $t;
+    }
+    return './' . ($q ? '?' . http_build_query($q) : '');
+};
 $data = vitrina_load();
 $events = $data['events'] ?? [];
 $categories = $data['categories'] ?? [];
@@ -48,15 +62,19 @@ $noscriptList = $upcoming !== [] ? $upcoming : array_slice(array_reverse($events
   <meta name="description" content="Конференции, семинары, вебинары и конкурсы Института развития образования Забайкальского края: ближайшие события, архив и календарь.">
   <meta property="og:title" content="<?= $h((string) $cfg['site_name']) ?>">
   <meta property="og:description" content="Ближайшие события, архив и календарь мероприятий #educationlife.">
-  <meta name="theme-color" content="#2fc06e">
-  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="<?= $theme === 'flag' ? '#1e5a3a' : '#2fc06e' ?>">
+  <link rel="icon" href="<?= $h($favicon) ?>" type="image/svg+xml">
   <link rel="stylesheet" href="assets/vitrina.css?v=<?= (int) @filemtime(__DIR__ . '/assets/vitrina.css') ?>">
+  <?php if ($theme === 'flag'): ?>
+  <link rel="stylesheet" href="assets/theme-flag.css?v=<?= (int) @filemtime(__DIR__ . '/assets/theme-flag.css') ?>">
+  <?php endif; ?>
 </head>
-<body>
+<body class="theme-<?= $h($theme) ?>">
   <header class="topbar">
+    <div class="flag-band" aria-hidden="true"></div>
     <div class="wrap">
       <a class="brand" href="./" aria-label="Витрина событий ИРО">
-        <img class="brand-mark" src="assets/favicon.svg" alt="" width="36" height="36">
+        <img class="brand-mark" src="<?= $h($favicon) ?>" alt="" width="36" height="36">
         <span>Витрина событий<small>ИРО Забайкальского края</small></span>
       </a>
       <nav class="top-nav" aria-label="Разделы">
@@ -162,6 +180,11 @@ $noscriptList = $upcoming !== [] ? $upcoming : array_slice(array_reverse($events
   <footer>
     <div class="wrap">
       <span>© <?= date('Y') ?> ГУ ДПО «Институт развития образования Забайкальского края», Чита</span>
+      <span class="theme-switch">Оформление:
+        <?php foreach ($themes as $key => $label): ?>
+          <a href="<?= $h($themeUrl($key)) ?>"<?= $key === $theme ? ' aria-current="true"' : '' ?>><?= $h($label) ?></a>
+        <?php endforeach; ?>
+      </span>
       <span>Данные: <a href="<?= $h((string) $cfg['source']) ?>/" target="_blank" rel="noopener"><?= $h((string) preg_replace('~^https?://~', '', (string) $cfg['source'])) ?></a><?php if (!empty($data['updated_at'])): ?> · обновлено <?= $h((new DateTimeImmutable($data['updated_at']))->format('d.m.Y H:i')) ?><?php endif; ?></span>
     </div>
   </footer>

@@ -110,6 +110,7 @@
 
   function syncUrl() {
     var p = new URLSearchParams();
+    if (params.get('theme')) p.set('theme', params.get('theme'));
     if (state.q) p.set('q', state.q);
     if (state.cat !== 'all') p.set('cat', state.cat);
     if (state.when !== 'all') p.set('when', state.when);

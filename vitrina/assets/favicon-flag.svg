@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" role="img" aria-label="Витрина событий">
+  <defs><clipPath id="r"><rect width="36" height="36" rx="10"/></clipPath></defs>
+  <g clip-path="url(#r)">
+    <rect width="36" height="18" fill="#1e5a3a"/>
+    <rect y="18" width="36" height="18" fill="#b3261e"/>
+    <path d="M0 0L18 18 0 36z" fill="#e3a92b"/>
+  </g>
+  <rect x="17" y="10" width="13" height="13" rx="2.5" fill="#fff"/>
+  <path d="M17 14.5h13" stroke="#1e5a3a" stroke-width="1.6"/>
+  <path d="M20.5 8.5v3M26.5 8.5v3" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="23.5" cy="18.5" r="2" fill="#b3261e"/>
+</svg>

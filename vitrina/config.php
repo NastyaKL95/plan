@@ -12,6 +12,8 @@ return array_replace([
     'timezone' => 'Asia/Chita',
     'http_timeout' => 12,
     'parallel' => 6,
+    // Оформление по умолчанию: eco — как страница экосистемы, flag — цвета флага края.
+    'theme' => 'eco',
     'site_name' => 'Витрина событий ИРО Забайкальского края',
     'ecosystem_url' => 'https://planiro75.ru/public/ecosystem.html',
 ], $overrides);
