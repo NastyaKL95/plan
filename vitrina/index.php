@@ -4,46 +4,31 @@ declare(strict_types=1);
 require __DIR__ . '/lib/events.php';
 
 $cfg = vitrina_config();
-$themes = ['eco' => 'Экосистема', 'flag' => 'Цвета флага края'];
-$theme = (string) ($_GET['theme'] ?? $cfg['theme']);
-if (!isset($themes[$theme])) {
-    $theme = 'eco';
+$events = [];
+$categories = [];
+$failed = false;
+try {
+    $events = vitrina_public_events();
+    $categories = vitrina_categories();
+} catch (PDOException $ex) {
+    $failed = true;
+    error_log('vitrina: ' . $ex->getMessage());
 }
-$favicon = $theme === 'flag' ? 'assets/favicon-flag.svg' : 'assets/favicon.svg';
-$themeUrl = static function (string $t) use ($cfg): string {
-    $q = $_GET;
-    unset($q['theme']);
-    if ($t !== $cfg['theme']) {
-        $q['theme'] = $t;
-    }
-    return './' . ($q ? '?' . http_build_query($q) : '');
-};
-$data = vitrina_load();
-$events = $data['events'] ?? [];
-$categories = $data['categories'] ?? [];
+$used = array_flip(array_column($events, 'cat'));
+$icons = vitrina_icons();
 
 $payload = [
-    'updatedAt' => $data['updated_at'] ?? null,
-    'source' => $cfg['source'],
     'timezone' => $cfg['timezone'],
-    'categories' => $categories,
-    'events' => array_map(static fn (array $e): array => [
-        'id' => $e['id'],
-        'title' => $e['title'],
-        'url' => $e['url'],
-        'ics' => $e['ics'],
-        'start' => $e['start'],
-        'end' => $e['end'],
-        'cat' => $e['category'],
-        'place' => $e['place'],
-        'excerpt' => $e['excerpt'],
-        'description' => $e['description'],
-        'image' => $e['image'],
-        'imageLarge' => $e['image_large'],
-    ], $events),
+    'categories' => array_values(array_map(static fn (array $c): array => [
+        'key' => $c['slug'],
+        'label' => $c['name'],
+        'color' => $c['color'],
+        'icon' => $c['icon'],
+    ], array_filter($categories, static fn (array $c): bool => isset($used[$c['slug']])))),
+    'icons' => array_map(static fn (array $i): string => $i[1], $icons),
+    'events' => $events,
 ];
 
-$h = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 $months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 $fmtDate = static function (string $iso) use ($months): string {
     $d = new DateTimeImmutable($iso);
@@ -58,29 +43,25 @@ $noscriptList = $upcoming !== [] ? $upcoming : array_slice(array_reverse($events
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><?= $h((string) $cfg['site_name']) ?></title>
+  <title><?= h((string) $cfg['site_name']) ?></title>
   <meta name="description" content="Конференции, семинары, вебинары и конкурсы Института развития образования Забайкальского края: ближайшие события, архив и календарь.">
-  <meta property="og:title" content="<?= $h((string) $cfg['site_name']) ?>">
+  <meta property="og:title" content="<?= h((string) $cfg['site_name']) ?>">
   <meta property="og:description" content="Ближайшие события, архив и календарь мероприятий #educationlife.">
-  <meta name="theme-color" content="<?= $theme === 'flag' ? '#1e5a3a' : '#2fc06e' ?>">
-  <link rel="icon" href="<?= $h($favicon) ?>" type="image/svg+xml">
+  <meta name="theme-color" content="#2fc06e">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/vitrina.css?v=<?= (int) @filemtime(__DIR__ . '/assets/vitrina.css') ?>">
-  <?php if ($theme === 'flag'): ?>
-  <link rel="stylesheet" href="assets/theme-flag.css?v=<?= (int) @filemtime(__DIR__ . '/assets/theme-flag.css') ?>">
-  <?php endif; ?>
 </head>
-<body class="theme-<?= $h($theme) ?>">
+<body>
   <header class="topbar">
-    <div class="flag-band" aria-hidden="true"></div>
     <div class="wrap">
       <a class="brand" href="./" aria-label="Витрина событий ИРО">
-        <img class="brand-mark" src="<?= $h($favicon) ?>" alt="" width="36" height="36">
+        <img class="brand-mark" src="assets/favicon.svg" alt="" width="36" height="36">
         <span>Витрина событий<small>ИРО Забайкальского края</small></span>
       </a>
       <nav class="top-nav" aria-label="Разделы">
         <a href="#events">События</a>
         <a href="#events" data-view-link="calendar">Календарь</a>
-        <a class="top-link" href="<?= $h((string) $cfg['ecosystem_url']) ?>">
+        <a class="top-link" href="<?= h((string) $cfg['ecosystem_url']) ?>">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/></svg>
           <span>Экосистема ИРО</span>
         </a>
@@ -94,12 +75,12 @@ $noscriptList = $upcoming !== [] ? $upcoming : array_slice(array_reverse($events
         <div class="hero-text">
           <span class="eyebrow">#educationlife</span>
           <h1>Витрина событий <span class="accent">ИРО Забайкальского края</span></h1>
-          <p class="lead">Конференции, семинары, вебинары и конкурсы для педагогов края. Ближайшие события, архив и календарь собраны с сайта мероприятий института.</p>
+          <p class="lead">Конференции, семинары, вебинары и конкурсы для педагогов края. Ближайшие события, архив и календарь мероприятий института в одном месте.</p>
           <div class="hero-actions">
             <a class="btn btn-primary" href="#events">Смотреть события
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
             </a>
-            <a class="btn btn-ghost" href="<?= $h((string) $cfg['source']) ?>/" target="_blank" rel="noopener">Сайт мероприятий</a>
+            <a class="btn btn-ghost" href="#events" data-view-link="calendar">Календарь</a>
           </div>
           <div class="stats" id="stats" aria-live="polite"></div>
         </div>
@@ -163,13 +144,14 @@ $noscriptList = $upcoming !== [] ? $upcoming : array_slice(array_reverse($events
         <noscript>
           <div class="grid">
             <?php foreach ($noscriptList as $e): ?>
-              <a class="card" href="<?= $h($e['url']) ?>">
+              <div class="card">
                 <div class="card-body">
-                  <span class="pill"><?= $h($e['category_label']) ?></span>
-                  <h3><?= $h($e['title']) ?></h3>
-                  <div class="meta"><?= $h($fmtDate($e['start'])) ?><?= $e['place'] !== '' ? ' · ' . $h($e['place']) : '' ?></div>
+                  <span class="pill"><?= h($e['catName']) ?></span>
+                  <h3><?= h($e['title']) ?></h3>
+                  <div class="meta"><?= h($fmtDate($e['start'])) ?><?= $e['place'] !== '' ? ' · ' . h($e['place']) : '' ?></div>
+                  <?php if ($e['excerpt'] !== ''): ?><p><?= h($e['excerpt']) ?></p><?php endif; ?>
                 </div>
-              </a>
+              </div>
             <?php endforeach; ?>
           </div>
         </noscript>
@@ -180,12 +162,7 @@ $noscriptList = $upcoming !== [] ? $upcoming : array_slice(array_reverse($events
   <footer>
     <div class="wrap">
       <span>© <?= date('Y') ?> ГУ ДПО «Институт развития образования Забайкальского края», Чита</span>
-      <span class="theme-switch">Оформление:
-        <?php foreach ($themes as $key => $label): ?>
-          <a href="<?= $h($themeUrl($key)) ?>"<?= $key === $theme ? ' aria-current="true"' : '' ?>><?= $h($label) ?></a>
-        <?php endforeach; ?>
-      </span>
-      <span>Данные: <a href="<?= $h((string) $cfg['source']) ?>/" target="_blank" rel="noopener"><?= $h((string) preg_replace('~^https?://~', '', (string) $cfg['source'])) ?></a><?php if (!empty($data['updated_at'])): ?> · обновлено <?= $h((new DateTimeImmutable($data['updated_at']))->format('d.m.Y H:i')) ?><?php endif; ?></span>
+      <span><a href="<?= h((string) $cfg['ecosystem_url']) ?>">Экосистема ИРО</a> · <a class="admin-link" href="admin/">Вход для редакторов</a></span>
     </div>
   </footer>
 
@@ -200,15 +177,15 @@ $noscriptList = $upcoming !== [] ? $upcoming : array_slice(array_reverse($events
       <div class="modal-meta" id="mMeta"></div>
       <div class="modal-text" id="mText"></div>
       <div class="modal-actions">
-        <a class="btn btn-primary" id="mOpen" href="#" target="_blank" rel="noopener">Страница события</a>
+        <a class="btn btn-primary" id="mOpen" href="#" target="_blank" rel="noopener">Подробнее</a>
         <a class="btn btn-ghost" id="mIcs" href="#">Добавить в календарь</a>
         <button type="button" class="btn btn-ghost" id="mShare">Скопировать ссылку</button>
       </div>
     </div>
   </dialog>
 
-  <?php if ($data === null): ?>
-    <div class="banner-error wrap">Не удалось загрузить события с сайта мероприятий. Попробуйте обновить страницу позже.</div>
+  <?php if ($failed): ?>
+    <div class="banner-error wrap">Витрина временно недоступна. Попробуйте обновить страницу позже.</div>
   <?php endif; ?>
 
   <script id="vitrina-data" type="application/json"><?= json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>

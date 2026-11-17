@@ -8,14 +8,7 @@
   var MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
   var MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
   var WEEKDAYS = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
-  var ICONS = {
-    conference: '<path d="M3 21h18M5 21V10l7-5 7 5v11"/><path d="M9 21v-6h6v6"/>',
-    seminar: '<path d="M4 5h16v11H4z"/><path d="M8 20h8M12 16v4"/><path d="M8 9h8M8 12h5"/>',
-    webinar: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/><path d="M10 8l4 2-4 2z"/>',
-    symposium: '<circle cx="12" cy="8" r="3"/><circle cx="5" cy="11" r="2"/><circle cx="19" cy="11" r="2"/><path d="M7 20c0-3 2.2-5 5-5s5 2 5 5M1.5 19c0-2 1.5-3.5 3.5-3.5M22.5 19c0-2-1.5-3.5-3.5-3.5"/>',
-    contest: '<path d="M8 21h8M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
-    other: '<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3 10h18"/>'
-  };
+  var ICONS = raw.icons || {};
   var I_CLOCK = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
   var I_PIN = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
   var I_CAL = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>';
@@ -45,17 +38,21 @@
   var catMap = {};
   (raw.categories || []).forEach(function (c) { catMap[c.key] = c; });
   function catLabel(key) { return catMap[key] ? catMap[key].label : 'Событие'; }
-  function catColor(key) { return 'var(--c-' + (ICONS[key] ? key : 'other') + ')'; }
+  function catColor(key) { return catMap[key] && /^#[0-9a-f]{6}$/i.test(catMap[key].color) ? catMap[key].color : 'var(--c-default)'; }
+  function catIcon(key) { return ICONS[catMap[key] ? catMap[key].icon : 'other'] || ICONS.other || ''; }
+  function linkify(text) {
+    return esc(text).replace(/https?:\/\/[^\s<>"']+[^\s<>"'.,;:!?)\]»]/g, function (u) {
+      return '<a href="' + u + '" target="_blank" rel="noopener">' + u + '</a>';
+    });
+  }
 
   var now = Date.now();
   var events = (raw.events || []).map(function (e) {
     var startKey = e.start.slice(0, 10);
     var endKey = (e.end || e.start).slice(0, 10);
-    var t1 = e.start.slice(11, 16), t2 = (e.end || e.start).slice(11, 16);
-    var hasTime = !(t1 === '00:00' && (t2 === '00:00' || t2 === '23:59'));
     e.startKey = startKey;
     e.endKey = endKey < startKey ? startKey : endKey;
-    e.timeText = hasTime ? (t2 && t2 !== t1 && endKey === startKey ? t1 + '–' + t2 : t1) : '';
+    e.timeText = e.time || '';
     e.past = new Date(e.end || e.start).getTime() < now;
     e.year = startKey.slice(0, 4);
     e.hay = norm([e.title, e.place, e.excerpt, e.description, catLabel(e.cat)].join(' '));
@@ -89,9 +86,9 @@
 
   function media(e, cls, large) {
     var src = large ? (e.imageLarge || e.image) : e.image;
-    var ph = '<div class="ph" style="--c:' + catColor(e.cat) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[e.cat] || ICONS.other) + '</svg></div>';
+    var ph = '<div class="ph" style="--c:' + catColor(e.cat) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + catIcon(e.cat) + '</svg></div>';
     if (!src) return ph;
-    return ph + '<img class="' + (cls || '') + '" src="' + esc(src) + '" alt="" loading="lazy" decoding="async" onerror="this.remove()">';
+    return ph + '<img class="' + (cls || '') + '" src="' + esc(src) + '" alt=""' + (large ? '' : ' loading="lazy"') + ' decoding="async" onerror="this.remove()">';
   }
 
   /* Состояние фильтров живёт в адресе страницы, чтобы подборкой можно было поделиться. */
@@ -110,7 +107,6 @@
 
   function syncUrl() {
     var p = new URLSearchParams();
-    if (params.get('theme')) p.set('theme', params.get('theme'));
     if (state.q) p.set('q', state.q);
     if (state.cat !== 'all') p.set('cat', state.cat);
     if (state.when !== 'all') p.set('when', state.when);
@@ -145,10 +141,10 @@
       '<div class="stat"><b>' + events.length + '</b><span>в архиве с ' + (events.length ? events[0].year : thisYear) + ' года</span></div>' +
       '<div class="stat"><b>' + types + '</b><span>' + plural(types, 'формат', 'формата', 'форматов') + '</span></div>';
 
-    var e = upcoming[0] || past[0];
+    var e = upcoming.filter(function (x) { return x.pinned; })[0] || upcoming[0] || past[0];
     if (!e) { $('feature').innerHTML = ''; return; }
     var d = keyToDate(e.startKey);
-    var label = upcoming.length ? 'Ближайшее событие' : 'Последнее событие';
+    var label = e.past ? 'Последнее событие' : e.pinned && e !== upcoming[0] ? 'Главное событие' : 'Ближайшее событие';
     $('feature').innerHTML =
       '<button type="button" class="feature" data-open="' + e.id + '" style="--c:' + catColor(e.cat) + '">' +
         (e.imageLarge || e.image ? '<img class="feature-img" src="' + esc(e.imageLarge || e.image) + '" alt="" onerror="this.remove()">' : '') +
@@ -333,10 +329,13 @@
       (e.timeText ? '<div>' + I_CLOCK + '<span><small>Время (Чита)</small>' + esc(e.timeText) + '</span></div>' : '') +
       (e.place ? '<div>' + I_PIN + '<span><small>Место</small>' + esc(e.place) + '</span></div>' : '') +
       '<div>' + I_TAG + '<span><small>Статус</small>' + esc(e.past ? 'Событие прошло' : rel) + '</span></div>';
-    var text = (e.description || e.excerpt || '').split(/\n+/).filter(function (s) { return s.trim(); });
-    $('mText').innerHTML = text.length ? text.map(function (p) { return '<p>' + esc(p) + '</p>'; }).join('') : '<p>Описание появится на странице события.</p>';
-    $('mOpen').href = e.url;
-    $('mIcs').href = e.ics;
+    var text = (e.description || e.excerpt || '').split(/\n\s*\n/).filter(function (s) { return s.trim(); });
+    $('mText').innerHTML = text.length
+      ? text.map(function (p) { return '<p>' + p.trim().split('\n').map(linkify).join('<br>') + '</p>'; }).join('')
+      : '<p>Подробности появятся позже.</p>';
+    $('mOpen').hidden = !e.link;
+    if (e.link) { $('mOpen').href = e.link; $('mOpen').textContent = e.linkLabel || 'Подробнее'; }
+    $('mIcs').href = 'ics.php?id=' + e.id;
     $('mIcs').hidden = e.past;
     if (push !== false) history.replaceState(null, '', location.pathname + location.search + '#e-' + e.id);
     if (!modal.open) modal.showModal();

@@ -4,16 +4,19 @@ declare(strict_types=1);
 $local = __DIR__ . '/config.local.php';
 $overrides = is_file($local) ? (array) require $local : [];
 
-return array_replace([
-    'source' => 'https://eventt.zabedu.ru',
-    'cache_dir' => __DIR__ . '/cache',
-    // Через сколько секунд данные считаются устаревшими и обновляются в фоне.
-    'ttl' => 1800,
+return array_replace_recursive([
+    'db' => [
+        'host' => '127.0.0.1',
+        'port' => 3306,
+        'name' => 'vitrina',
+        'user' => 'vitrina',
+        'pass' => '',
+    ],
+    'table_prefix' => 'vitrina_',
     'timezone' => 'Asia/Chita',
-    'http_timeout' => 12,
-    'parallel' => 6,
-    // Оформление по умолчанию: eco — как страница экосистемы, flag — цвета флага края.
-    'theme' => 'eco',
+    // Ключ для первичной настройки в admin/setup.php. Пока он пуст, настройка через браузер закрыта.
+    'setup_key' => '',
+    'upload_max_mb' => 8,
     'site_name' => 'Витрина событий ИРО Забайкальского края',
     'ecosystem_url' => 'https://planiro75.ru/public/ecosystem.html',
 ], $overrides);

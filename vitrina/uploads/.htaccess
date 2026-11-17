@@ -1,0 +1,7 @@
+# Здесь только картинки, пересохранённые админкой. Скрипты не выполняются и не отдаются.
+<FilesMatch "(?i)\.(php\d?|phtml|phar|pl|py|cgi|sh|htaccess)$">
+  Require all denied
+</FilesMatch>
+<IfModule mod_php.c>
+  php_flag engine off
+</IfModule>
