@@ -1,4 +1,5 @@
 -- Таблицы витрины событий. Префикс vitrina_ задаётся в config.php (table_prefix).
+-- Файл можно выполнять повторно: админка сама досоздаёт недостающие таблицы после обновления.
 
 CREATE TABLE IF NOT EXISTS vitrina_categories (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -55,10 +56,20 @@ CREATE TABLE IF NOT EXISTS vitrina_login_attempts (
   KEY idx_ip_time (ip, attempted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT IGNORE INTO vitrina_categories (slug, name, color, icon, sort_order) VALUES
-  ('conference', 'Конференции', '#2b8cff', 'conference', 10),
-  ('seminar', 'Семинары', '#8b5cf6', 'seminar', 20),
-  ('webinar', 'Вебинары', '#14b8a6', 'webinar', 30),
-  ('symposium', 'Симпозиумы', '#f59e0b', 'symposium', 40),
-  ('contest', 'Конкурсы', '#ef4f6b', 'contest', 50),
-  ('other', 'Другое', '#64748b', 'other', 90);
+CREATE TABLE IF NOT EXISTS vitrina_sessions (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  event_id INT UNSIGNED NOT NULL,
+  day_date DATE NOT NULL,
+  start_time TIME NULL,
+  end_time TIME NULL,
+  kind ENUM('session','plenary','break') NOT NULL DEFAULT 'session',
+  title VARCHAR(300) NOT NULL,
+  place VARCHAR(300) NOT NULL DEFAULT '',
+  moderators TEXT NOT NULL,
+  description TEXT NOT NULL,
+  join_url VARCHAR(500) NOT NULL DEFAULT '',
+  join_label VARCHAR(60) NOT NULL DEFAULT '',
+  sort_order INT NOT NULL DEFAULT 0,
+  KEY idx_event_day (event_id, day_date, sort_order),
+  CONSTRAINT fk_vitrina_sessions_event FOREIGN KEY (event_id) REFERENCES vitrina_events (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

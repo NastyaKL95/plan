@@ -13,6 +13,9 @@
   var I_PIN = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
   var I_CAL = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>';
   var I_TAG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>';
+  var I_USER = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>';
+  var I_LIST = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>';
+  var I_VIDEO = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="14" height="12" rx="2.5"/><path d="M16 10.5l6-3.5v10l-6-3.5"/></svg>';
   var I_ARROW = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>';
 
   function $(id) { return document.getElementById(id); }
@@ -55,7 +58,16 @@
     e.timeText = e.time || '';
     e.past = new Date(e.end || e.start).getTime() < now;
     e.year = startKey.slice(0, 4);
-    e.hay = norm([e.title, e.place, e.excerpt, e.description, catLabel(e.cat)].join(' '));
+    e.program = e.program || [];
+    var progText = [];
+    e.sessionsCount = 0;
+    e.program.forEach(function (d) {
+      d.items.forEach(function (it) {
+        if (it.kind !== 'break') e.sessionsCount++;
+        progText.push(it.title, it.place, it.moderators);
+      });
+    });
+    e.hay = norm([e.title, e.place, e.excerpt, e.description, catLabel(e.cat)].concat(progText).join(' '));
     return e;
   });
   var byId = {};
@@ -198,6 +210,7 @@
         '<div class="meta">' +
           '<div>' + I_CAL + '<span>' + esc(dateText(e, false)) + (e.timeText ? ', ' + esc(e.timeText) : '') + '</span></div>' +
           (e.place ? '<div>' + I_PIN + '<span>' + esc(e.place) + '</span></div>' : '') +
+          (e.sessionsCount ? '<div>' + I_LIST + '<span>' + esc(programSummary(e)) + '</span></div>' : '') +
         '</div>' +
         (e.excerpt ? '<p>' + esc(e.excerpt) + '</p>' : '') +
       '</div>' +
@@ -336,11 +349,96 @@
     $('mOpen').hidden = !e.link;
     if (e.link) { $('mOpen').href = e.link; $('mOpen').textContent = e.linkLabel || 'Подробнее'; }
     $('mIcs').href = 'ics.php?id=' + e.id;
+    renderProgram(e);
     $('mIcs').hidden = e.past;
     if (push !== false) history.replaceState(null, '', location.pathname + location.search + '#e-' + e.id);
     if (!modal.open) modal.showModal();
     modal.scrollTop = 0;
   }
+  /* Программа события: дни, площадки, параллельные секции */
+  function programSummary(e) {
+    var d = e.program.length, n = e.sessionsCount;
+    return 'Программа: ' + (d > 1 ? d + ' ' + plural(d, 'день', 'дня', 'дней') + ', ' : '') + n + ' ' + plural(n, 'пункт', 'пункта', 'пунктов');
+  }
+  function nowHM() {
+    return new Intl.DateTimeFormat('ru-RU', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
+  }
+  function sessionLive(day, it) {
+    if (day !== todayKey() || !it.start) return false;
+    var t = nowHM();
+    return t >= it.start && t < (it.end || it.start);
+  }
+  function dayLabel(k, i) {
+    var d = keyToDate(k);
+    return 'День ' + (i + 1) + ' · ' + d.getUTCDate() + ' ' + MONTHS_GEN[d.getUTCMonth()] + ', ' + WEEKDAYS[d.getUTCDay()];
+  }
+  function sessionHtml(e, day, it, inTrack) {
+    var live = !e.past && sessionLive(day, it);
+    var mods = (it.moderators || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+    return '<article class="sess sess-' + esc(it.kind) + (live ? ' is-live' : '') + '">' +
+      '<div class="sess-tags">' +
+        (it.kind === 'plenary' ? '<span class="sess-tag">Пленарное заседание</span>' : '') +
+        (live ? '<span class="sess-live">Идёт сейчас</span>' : '') +
+        (inTrack && it.time ? '<span class="sess-time">' + esc(it.time) + '</span>' : '') +
+      '</div>' +
+      '<h4>' + esc(it.title) + '</h4>' +
+      (it.place ? '<div class="sess-meta">' + I_PIN + '<span>' + esc(it.place) + '</span></div>' : '') +
+      (mods.length ? '<div class="sess-meta">' + I_USER + '<span><small>' + (mods.length > 1 ? 'Ведущие' : 'Ведущий') + '</small>' + mods.map(esc).join('<br>') + '</span></div>' : '') +
+      (it.description ? '<p class="sess-desc">' + it.description.split('\n').map(linkify).join('<br>') + '</p>' : '') +
+      (it.joinUrl && !e.past ? '<a class="btn btn-sm btn-join" href="' + esc(it.joinUrl) + '" target="_blank" rel="noopener">' + I_VIDEO + esc(it.joinLabel) + '</a>' : '') +
+    '</article>';
+  }
+  function dayHtml(e, day) {
+    var items = day.items, html = '', i = 0;
+    while (i < items.length) {
+      var it = items[i];
+      if (it.kind === 'break') {
+        html += '<div class="slot slot-break"><div class="slot-time">' + esc(it.time) + '</div>' +
+          '<div class="slot-body"><span>' + esc(it.title) + '</span>' + (it.place ? '<small>' + esc(it.place) + '</small>' : '') + '</div></div>';
+        i++;
+        continue;
+      }
+      var group = [it];
+      while (it.start && i + group.length < items.length && items[i + group.length].kind !== 'break' && items[i + group.length].start === it.start) {
+        group.push(items[i + group.length]);
+      }
+      var sameEnd = group.every(function (g) { return g.end === it.end; });
+      var time = it.start ? '<b>' + esc(it.start) + '</b>' + (sameEnd && it.end && it.end !== it.start ? '<small>до ' + esc(it.end) + '</small>' : '') : '';
+      html += '<div class="slot"><div class="slot-time">' + time + '</div><div class="slot-body">' +
+        (group.length > 1
+          ? '<div class="slot-par">Параллельно · ' + group.length + ' ' + plural(group.length, 'площадка', 'площадки', 'площадок') + '</div><div class="tracks">' +
+            group.map(function (g) { return sessionHtml(e, day.date, g, !sameEnd); }).join('') + '</div>'
+          : sessionHtml(e, day.date, it, false)) +
+        '</div></div>';
+      i += group.length;
+    }
+    return html;
+  }
+  function renderProgram(e) {
+    var box = $('mProgram');
+    modal.classList.toggle('has-program', e.program.length > 0);
+    if (!e.program.length) { box.hidden = true; box.innerHTML = ''; return; }
+    var t = todayKey();
+    var active = 0;
+    e.program.forEach(function (d, i) { if (d.date === t) active = i; });
+    var tabs = e.program.length > 1
+      ? '<div class="program-days" role="tablist" aria-label="Дни программы">' + e.program.map(function (d, i) {
+          return '<button type="button" role="tab" data-day-tab="' + i + '" aria-selected="' + (i === active) + '">' + esc(dayLabel(d.date, i)) + '</button>';
+        }).join('') + '</div>'
+      : '';
+    box.innerHTML = '<h3>Программа</h3>' + tabs + e.program.map(function (d, i) {
+      return '<div class="program-day" data-day="' + i + '"' + (i === active ? '' : ' hidden') + '>' + dayHtml(e, d) + '</div>';
+    }).join('');
+    box.hidden = false;
+  }
+  $('mProgram').addEventListener('click', function (ev) {
+    var tab = ev.target.closest('[data-day-tab]');
+    if (!tab) return;
+    var n = tab.getAttribute('data-day-tab');
+    this.querySelectorAll('[data-day-tab]').forEach(function (b) { b.setAttribute('aria-selected', String(b === tab)); });
+    this.querySelectorAll('.program-day').forEach(function (d) { d.hidden = d.getAttribute('data-day') !== n; });
+  });
+
   function closeModal() {
     if (modal.open) modal.close();
   }

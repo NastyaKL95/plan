@@ -49,8 +49,38 @@ function admin_current(): ?array
     return $user;
 }
 
+function admin_run_sql_file(string $file): void
+{
+    $prefix = (string) vitrina_config()['table_prefix'];
+    $sql = (string) file_get_contents(VITRINA_ROOT . '/install/' . $file);
+    $sql = str_replace('vitrina_', $prefix, (string) preg_replace('~^--.*$~m', '', $sql));
+    foreach (array_filter(array_map('trim', explode(";\n", $sql))) as $statement) {
+        vitrina_db()->exec($statement);
+    }
+}
+
+/** После обновления сайта досоздаёт новые таблицы, чтобы не запускать миграции вручную. */
+function admin_ensure_schema(): void
+{
+    $st = vitrina_db()->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?');
+    $st->execute([vitrina_config()['table_prefix'] . 'sessions']);
+    if ($st->fetchColumn() === false) {
+        admin_run_sql_file('schema.sql');
+    }
+}
+
 function admin_require(): array
 {
+    try {
+        admin_ensure_schema();
+    } catch (PDOException $ex) {
+        if (!admin_has_admins()) {
+            admin_redirect('setup.php');
+        }
+        error_log('vitrina schema: ' . $ex->getMessage());
+        http_response_code(500);
+        exit('Не удалось обновить таблицы витрины в базе данных. Подробности в журнале ошибок PHP.');
+    }
     $user = admin_current();
     if ($user === null) {
         header('Location: ' . (admin_has_admins() ? 'login.php' : 'setup.php'));

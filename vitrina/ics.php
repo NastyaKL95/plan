@@ -57,7 +57,21 @@ $place = vitrina_place_text($e);
 if ($place !== '') {
     $lines[] = 'LOCATION:' . ics_escape($place);
 }
-$desc = trim($e['description'] . ($e['link_url'] !== '' ? "\n\n" . ($e['link_label'] ?: 'Подробнее') . ': ' . $e['link_url'] : ''));
+$program = '';
+$sessions = vitrina_sessions([(int) $e['id']])[(int) $e['id']] ?? [];
+$lastDay = null;
+foreach ($sessions as $sess) {
+    if ($sess['day_date'] !== $lastDay && $sessions[0]['day_date'] !== end($sessions)['day_date']) {
+        $program .= "\n" . date('d.m.Y', strtotime($sess['day_date'])) . "\n";
+    }
+    $lastDay = $sess['day_date'];
+    $program .= trim(vitrina_session_time($sess) . ' ' . $sess['title'])
+        . ($sess['place'] !== '' ? ' (' . $sess['place'] . ')' : '')
+        . ($sess['join_url'] !== '' ? ' — ' . $sess['join_url'] : '') . "\n";
+}
+$desc = trim($e['description']
+    . ($program !== '' ? "\n\nПрограмма:\n" . trim($program) : '')
+    . ($e['link_url'] !== '' ? "\n\n" . ($e['link_label'] ?: 'Подробнее') . ': ' . $e['link_url'] : ''));
 if ($desc !== '') {
     $lines[] = 'DESCRIPTION:' . ics_escape($desc);
 }

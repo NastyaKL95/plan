@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/bootstrap.php';
 
 const VITRINA_FORMATS = ['offline' => 'Очно', 'online' => 'Онлайн', 'hybrid' => 'Очно и онлайн'];
+const VITRINA_SESSION_KINDS = ['session' => 'Площадка', 'plenary' => 'Пленарное заседание', 'break' => 'Перерыв, регистрация'];
 
 /** Иконки типов событий: содержимое SVG 24×24 со stroke="currentColor". */
 function vitrina_icons(): array
@@ -88,6 +89,59 @@ function vitrina_time_text(array $e): string
     return $t;
 }
 
+function vitrina_session_time(array $s): string
+{
+    if ($s['start_time'] === null) {
+        return '';
+    }
+    $t = substr($s['start_time'], 0, 5);
+    if ($s['end_time'] !== null && substr($s['end_time'], 0, 5) !== $t) {
+        $t .= '–' . substr($s['end_time'], 0, 5);
+    }
+    return $t;
+}
+
+/** Пункты программы событий в порядке показа: по дню, времени и порядку в админке. */
+function vitrina_sessions(array $eventIds): array
+{
+    if ($eventIds === []) {
+        return [];
+    }
+    $st = vitrina_db()->prepare('SELECT * FROM ' . vitrina_table('sessions') . ' WHERE event_id IN (' . implode(',', array_fill(0, count($eventIds), '?')) . ')
+        ORDER BY event_id, day_date, start_time IS NULL, start_time, sort_order, id');
+    $st->execute(array_values($eventIds));
+    $out = [];
+    foreach ($st->fetchAll() as $s) {
+        $out[(int) $s['event_id']][] = $s;
+    }
+    return $out;
+}
+
+/** Программа для витрины: дни, в каждом пункты со временем, местом, ведущими и ссылкой подключения. */
+function vitrina_program(array $sessions): array
+{
+    $days = [];
+    foreach ($sessions as $s) {
+        $days[$s['day_date']][] = [
+            'start' => $s['start_time'] !== null ? substr($s['start_time'], 0, 5) : '',
+            'end' => $s['end_time'] !== null ? substr($s['end_time'], 0, 5) : '',
+            'time' => vitrina_session_time($s),
+            'kind' => $s['kind'],
+            'title' => $s['title'],
+            'place' => $s['place'],
+            'moderators' => $s['moderators'],
+            'description' => $s['description'],
+            'joinUrl' => $s['join_url'],
+            'joinLabel' => $s['join_label'] !== '' ? $s['join_label'] : 'Подключиться',
+        ];
+    }
+    $program = [];
+    foreach ($days as $date => $items) {
+        $program[] = ['date' => $date, 'items' => $items];
+    }
+    return $program;
+}
+
 /** Опубликованные события для витрины и API, по возрастанию даты. */
 function vitrina_public_events(): array
 {
@@ -97,6 +151,11 @@ function vitrina_public_events(): array
          WHERE e.is_published = 1
          ORDER BY e.start_date, e.start_time IS NOT NULL, e.start_time, e.id'
     )->fetchAll();
+    try {
+        $sessions = vitrina_sessions(array_map(static fn (array $e): int => (int) $e['id'], $rows));
+    } catch (PDOException) {
+        $sessions = [];
+    }
 
     return array_map(static fn (array $e): array => [
         'id' => (int) $e['id'],
@@ -116,5 +175,6 @@ function vitrina_public_events(): array
         'image' => vitrina_upload_url($e['image_thumb'] !== '' ? $e['image_thumb'] : $e['image']),
         'imageLarge' => vitrina_upload_url($e['image']),
         'pinned' => (bool) $e['is_pinned'],
+        'program' => vitrina_program($sessions[(int) $e['id']] ?? []),
     ], $rows);
 }

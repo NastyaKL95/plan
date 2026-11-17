@@ -44,6 +44,135 @@ function event_valid_time(string $s): bool
     return (bool) preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $s);
 }
 
+const SESSION_FIELDS = ['day_date', 'start_time', 'end_time', 'kind', 'title', 'place', 'moderators', 'description', 'join_url', 'join_label'];
+
+function event_valid_url(string $url): bool
+{
+    return (bool) preg_match('~^https?://~i', $url) && filter_var($url, FILTER_VALIDATE_URL) !== false && strlen($url) <= 500;
+}
+
+function event_sessions_load(int $eventId): array
+{
+    $st = vitrina_db()->prepare('SELECT * FROM ' . vitrina_table('sessions') . ' WHERE event_id = ? ORDER BY day_date, start_time IS NULL, start_time, sort_order, id');
+    $st->execute([$eventId]);
+    return array_map(static fn (array $s): array => array_merge($s, [
+        'start_time' => $s['start_time'] !== null ? substr($s['start_time'], 0, 5) : '',
+        'end_time' => $s['end_time'] !== null ? substr($s['end_time'], 0, 5) : '',
+    ]), $st->fetchAll());
+}
+
+/**
+ * Разбирает пункты программы из формы, полностью пустые пропускает.
+ *
+ * @return array{0: list<array<string, string>>, 1: array<int, array<string, string>>}
+ */
+function event_sessions_parse(mixed $raw, string $from, string $to): array
+{
+    $rows = [];
+    $errors = [];
+    foreach (is_array($raw) ? $raw : [] as $r) {
+        if (!is_array($r)) {
+            continue;
+        }
+        $s = [];
+        foreach (SESSION_FIELDS as $f) {
+            $s[$f] = trim(str_replace("\r\n", "\n", (string) ($r[$f] ?? '')));
+        }
+        if ($s['title'] === '' && $s['place'] === '' && $s['moderators'] === '' && $s['description'] === '' && $s['join_url'] === '' && $s['start_time'] === '') {
+            continue;
+        }
+        $e = [];
+        if (!isset(VITRINA_SESSION_KINDS[$s['kind']])) {
+            $s['kind'] = 'session';
+        }
+        if ($s['title'] === '') {
+            $e['title'] = 'Укажите название.';
+        } elseif (mb_strlen($s['title']) > 300) {
+            $e['title'] = 'Не длиннее 300 символов.';
+        }
+        if ($s['day_date'] === '') {
+            $s['day_date'] = $from;
+        }
+        if (!event_valid_date($s['day_date'])) {
+            $e['day_date'] = 'Укажите день.';
+        } elseif (event_valid_date($from) && event_valid_date($to) && ($s['day_date'] < $from || $s['day_date'] > $to)) {
+            $e['day_date'] = 'Вне дат события.';
+        }
+        foreach (['start_time', 'end_time'] as $f) {
+            if ($s[$f] !== '' && !event_valid_time($s[$f])) {
+                $e[$f] = 'Формат ЧЧ:ММ.';
+            }
+        }
+        if ($s['end_time'] !== '' && $s['start_time'] === '' && !isset($e['end_time'])) {
+            $e['start_time'] = 'Укажите начало.';
+        } elseif (!isset($e['start_time']) && !isset($e['end_time']) && $s['end_time'] !== '' && $s['end_time'] < $s['start_time']) {
+            $e['end_time'] = 'Раньше начала.';
+        }
+        if (mb_strlen($s['place']) > 300) {
+            $e['place'] = 'Не длиннее 300 символов.';
+        }
+        if ($s['join_url'] !== '' && !event_valid_url($s['join_url'])) {
+            $e['join_url'] = 'Ссылка должна начинаться с http:// или https://.';
+        }
+        if (mb_strlen($s['join_label']) > 60) {
+            $e['join_label'] = 'Не длиннее 60 символов.';
+        }
+        if (mb_strlen($s['moderators']) > 3000 || mb_strlen($s['description']) > 5000) {
+            $e['description'] = 'Слишком длинный текст.';
+        }
+        if ($e) {
+            $errors[count($rows)] = $e;
+        }
+        $rows[] = $s;
+    }
+    return [$rows, $errors];
+}
+
+function event_sessions_save(int $eventId, array $rows): void
+{
+    $db = vitrina_db();
+    $db->prepare('DELETE FROM ' . vitrina_table('sessions') . ' WHERE event_id = ?')->execute([$eventId]);
+    $ins = $db->prepare('INSERT INTO ' . vitrina_table('sessions') . ' (event_id, day_date, start_time, end_time, kind, title, place, moderators, description, join_url, join_label, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    foreach (array_values($rows) as $i => $s) {
+        $ins->execute([
+            $eventId, $s['day_date'],
+            $s['start_time'] !== '' ? $s['start_time'] . ':00' : null,
+            $s['end_time'] !== '' ? $s['end_time'] . ':00' : null,
+            $s['kind'], $s['title'], $s['place'], $s['moderators'], $s['description'], $s['join_url'], $s['join_label'],
+            ($i + 1) * 10,
+        ]);
+    }
+}
+
+function event_session_row(string $key, array $s, array $err): string
+{
+    $n = 'sessions[' . $key . ']';
+    $e = static fn (string $f): string => isset($err[$f]) ? '<span class="a-error">' . h($err[$f]) . '</span>' : '';
+    $inv = static fn (string $f): string => isset($err[$f]) ? ' aria-invalid="true"' : '';
+    $v = static fn (string $f): string => h((string) ($s[$f] ?? ''));
+    $kinds = '';
+    foreach (VITRINA_SESSION_KINDS as $k => $label) {
+        $kinds .= '<option value="' . $k . '"' . (($s['kind'] ?? 'session') === $k ? ' selected' : '') . '>' . h($label) . '</option>';
+    }
+    $tool = static fn (string $act, string $label, string $icon): string => '<button type="button" class="a-icon-btn" data-sess="' . $act . '" title="' . $label . '" aria-label="' . $label . '">' . $icon . '</button>';
+    return '<div class="a-sess" data-kind="' . h($s['kind'] ?? 'session') . '">'
+        . '<div class="a-sess-head"><span class="a-sess-num"></span>'
+        . '<select name="' . $n . '[kind]" class="a-sess-kind" aria-label="Тип пункта">' . $kinds . '</select>'
+        . '<div class="a-sess-tools">' . $tool('up', 'Выше', '↑') . $tool('down', 'Ниже', '↓') . $tool('copy', 'Копировать', '⧉') . $tool('remove', 'Удалить пункт', '✕') . '</div></div>'
+        . '<div class="a-sess-grid">'
+        . '<label class="a-field a-f-date">День<input type="date" class="a-sess-date" name="' . $n . '[day_date]" value="' . $v('day_date') . '"' . $inv('day_date') . '>' . $e('day_date') . '</label>'
+        . '<label class="a-field a-f-time">Начало<input type="time" class="a-sess-start" name="' . $n . '[start_time]" value="' . $v('start_time') . '"' . $inv('start_time') . '>' . $e('start_time') . '</label>'
+        . '<label class="a-field a-f-time">Окончание<input type="time" class="a-sess-end" name="' . $n . '[end_time]" value="' . $v('end_time') . '"' . $inv('end_time') . '>' . $e('end_time') . '</label>'
+        . '<label class="a-field a-f-wide">Название<input name="' . $n . '[title]" maxlength="300" value="' . $v('title') . '"' . $inv('title') . ' placeholder="Пленарное заседание, мастерская, круглый стол…">' . $e('title') . '</label>'
+        . '<label class="a-field a-f-place">Место<input name="' . $n . '[place]" maxlength="300" value="' . $v('place') . '"' . $inv('place') . ' placeholder="Конференц-зал, ауд. 322">' . $e('place') . '</label>'
+        . '<label class="a-field a-f-extra a-f-url">Ссылка для подключения<input type="url" name="' . $n . '[join_url]" maxlength="500" value="' . $v('join_url') . '"' . $inv('join_url') . ' placeholder="https://… МАКС, Телемост, VK Звонки">' . $e('join_url') . '</label>'
+        . '<label class="a-field a-f-extra a-f-label">Текст кнопки<input name="' . $n . '[join_label]" maxlength="60" value="' . $v('join_label') . '"' . $inv('join_label') . ' placeholder="Подключиться" list="joinLabels">' . $e('join_label') . '</label>'
+        . '<label class="a-field a-f-extra a-f-half">Ведущие, модераторы<textarea name="' . $n . '[moderators]" rows="2" placeholder="По одному в строке: Иванова Анна Петровна, методист ИРО">' . $v('moderators') . '</textarea></label>'
+        . '<label class="a-field a-f-extra a-f-half">Описание<textarea name="' . $n . '[description]" rows="2"' . $inv('description') . ' placeholder="О чём площадка, для кого, что взять с собой">' . $v('description') . '</textarea>' . $e('description') . '</label>'
+        . '</div></div>';
+}
+
 $returnQs = (string) ($_POST['return'] ?? $_GET['return'] ?? '');
 $returnQs = preg_match('/^[\w%=&.+\-\[\]]*$/u', $returnQs) ? $returnQs : '';
 $listUrl = 'index.php' . ($returnQs !== '' ? '?' . $returnQs : '');
@@ -82,8 +211,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $copy['created_by'] = $copy['updated_by'] = $user['id'];
         $cols = array_keys($copy);
         $db->prepare("INSERT INTO $T (" . implode(', ', $cols) . ') VALUES (' . implode(', ', array_fill(0, count($cols), '?')) . ')')->execute(array_values($copy));
+        $newId = (int) $db->lastInsertId();
+        $db->prepare('INSERT INTO ' . vitrina_table('sessions') . ' (event_id, day_date, start_time, end_time, kind, title, place, moderators, description, join_url, join_label, sort_order)
+            SELECT ?, day_date, start_time, end_time, kind, title, place, moderators, description, join_url, join_label, sort_order FROM ' . vitrina_table('sessions') . ' WHERE event_id = ?')
+            ->execute([$newId, $id]);
         admin_flash('Создана копия в черновиках. Поправьте даты и опубликуйте.');
-        admin_redirect('event.php?id=' . (int) $db->lastInsertId());
+        admin_redirect('event.php?id=' . $newId);
     }
 
     if ($action === 'save') {
@@ -142,11 +275,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (mb_strlen($in['excerpt']) > 400) {
             $errors['excerpt'] = 'Анонс длиннее 400 символов.';
         }
-        if ($in['link_url'] !== '' && (!preg_match('~^https?://~i', $in['link_url']) || !filter_var($in['link_url'], FILTER_VALIDATE_URL) || strlen($in['link_url']) > 500)) {
+        if ($in['link_url'] !== '' && !event_valid_url($in['link_url'])) {
             $errors['link_url'] = 'Ссылка должна начинаться с http:// или https://.';
         }
         if (mb_strlen($in['link_label']) > 60) {
             $errors['link_label'] = 'Текст кнопки длиннее 60 символов.';
+        }
+
+        [$sessions, $sessionErrors] = event_sessions_parse($_POST['sessions'] ?? [], $in['start_date'], $in['end_date']);
+        if ($sessionErrors) {
+            $errors['program'] = 'Проверьте пункты программы, отмеченные красным.';
         }
 
         $newImage = null;
@@ -171,6 +309,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $row['updated_at'] = vitrina_now();
             $row['updated_by'] = $user['id'];
 
+            $db->beginTransaction();
             if ($event === null) {
                 $row['created_at'] = $row['updated_at'];
                 $row['created_by'] = $user['id'];
@@ -180,16 +319,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $set = implode(', ', array_map(static fn ($c) => "$c = ?", array_keys($row)));
                 $db->prepare("UPDATE $T SET $set WHERE id = ?")->execute([...array_values($row), $id]);
-                if ($row['image'] !== $event['image']) {
-                    event_release_images($event);
-                }
+            }
+            event_sessions_save($id, $sessions);
+            $db->commit();
+            if ($event !== null && $row['image'] !== $event['image']) {
+                event_release_images($event);
             }
             admin_flash($in['is_published'] ? 'Сохранено и опубликовано.' : 'Сохранено в черновиках.');
             admin_redirect('event.php?id=' . $id . ($returnQs !== '' ? '&return=' . rawurlencode($returnQs) : ''));
         }
         $form = $in + ['image' => $event['image'] ?? '', 'image_thumb' => $event['image_thumb'] ?? ''];
+        $formSessions = $sessions;
     }
 }
+
+$sessionErrors ??= [];
+$formSessions ??= $event !== null ? event_sessions_load((int) $event['id']) : [];
 
 if (!isset($form)) {
     $form = $event ?? [
@@ -252,6 +397,24 @@ admin_header($event ? 'Событие' : 'Новое событие', $user, 'ev
         <textarea name="excerpt" rows="2" maxlength="400" data-counter="400"<?= $inv('excerpt') ?> placeholder="Одно-два предложения. Если оставить пустым, возьмётся начало описания."><?= h($form['excerpt']) ?></textarea>
         <?= $err('excerpt') ?>
       </label>
+    </section>
+
+    <section class="a-card a-program">
+      <h2>Программа</h2>
+      <p class="a-hint">Дни, площадки и время. Площадки с одинаковым временем начала на сайте показываются рядом как параллельные. У площадки может быть своё место, ведущие и кнопка подключения для онлайн-участников. Если программа не нужна, оставьте раздел пустым.</p>
+      <?php if (isset($errors['program'])): ?><div class="a-flash a-flash-error"><?= h($errors['program']) ?></div><?php endif; ?>
+      <div class="a-sess-list" id="sessions">
+        <?php foreach ($formSessions as $i => $sess): ?>
+          <?= event_session_row((string) $i, $sess, $sessionErrors[$i] ?? []) ?>
+        <?php endforeach; ?>
+      </div>
+      <div class="a-program-actions">
+        <button type="button" class="a-btn" data-sess-add="session">+ Площадка</button>
+        <button type="button" class="a-btn" data-sess-add="plenary">+ Пленарное заседание</button>
+        <button type="button" class="a-btn" data-sess-add="break">+ Перерыв или регистрация</button>
+      </div>
+      <datalist id="joinLabels"><option value="Подключиться"><option value="Трансляция"><option value="Войти в МАКС"><option value="Яндекс Телемост"></datalist>
+      <template id="sessTpl"><?= event_session_row('__KEY__', ['kind' => 'session'], []) ?></template>
     </section>
 
     <section class="a-card">

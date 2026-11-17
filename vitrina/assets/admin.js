@@ -57,6 +57,80 @@
   });
 
   var dirty = false;
+
+  /* Программа события */
+  var list = document.getElementById('sessions');
+  var tpl = document.getElementById('sessTpl');
+  if (list && tpl) {
+    var seq = 0;
+    var syncDates = function () {
+      list.querySelectorAll('.a-sess-date').forEach(function (d) {
+        if (start && start.value) d.min = start.value;
+        var last = end && end.value ? end.value : (start ? start.value : '');
+        if (last) d.max = last;
+      });
+    };
+    var addRow = function (kind, after) {
+      var html = tpl.innerHTML.replace(/__KEY__/g, 'n' + (++seq));
+      var box = document.createElement('div');
+      box.innerHTML = html.trim();
+      var row = box.firstChild;
+      row.setAttribute('data-kind', kind);
+      row.querySelector('.a-sess-kind').value = kind;
+      var prevRow = after || list.lastElementChild;
+      var date = row.querySelector('.a-sess-date');
+      var st = row.querySelector('.a-sess-start');
+      if (prevRow) {
+        date.value = prevRow.querySelector('.a-sess-date').value;
+        st.value = prevRow.querySelector('.a-sess-end').value || '';
+      } else if (start) {
+        date.value = start.value;
+      }
+      if (after) after.insertAdjacentElement('afterend', row); else list.appendChild(row);
+      row.classList.add('is-new');
+      syncDates();
+      return row;
+    };
+    document.querySelectorAll('[data-sess-add]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var row = addRow(b.getAttribute('data-sess-add'));
+        row.querySelector('input[name$="[title]"]').focus();
+        dirty = true;
+      });
+    });
+    list.addEventListener('change', function (ev) {
+      if (ev.target.classList.contains('a-sess-kind')) ev.target.closest('.a-sess').setAttribute('data-kind', ev.target.value);
+    });
+    list.addEventListener('click', function (ev) {
+      var btn = ev.target.closest('[data-sess]');
+      if (!btn) return;
+      var row = btn.closest('.a-sess');
+      var act = btn.getAttribute('data-sess');
+      if (act === 'up' && row.previousElementSibling) list.insertBefore(row, row.previousElementSibling);
+      if (act === 'down' && row.nextElementSibling) list.insertBefore(row.nextElementSibling, row);
+      if (act === 'remove') {
+        var title = row.querySelector('input[name$="[title]"]').value;
+        if (title && !confirm('Удалить пункт «' + title + '»?')) return;
+        row.remove();
+      }
+      if (act === 'copy') {
+        var copy = addRow(row.getAttribute('data-kind'), row);
+        row.querySelectorAll('input, select, textarea').forEach(function (src) {
+          var field = src.name.replace(/^sessions\[[^\]]+\]/, '');
+          var dst = copy.querySelector('[name$="' + field + '"]');
+          if (dst) dst.value = src.value;
+        });
+        copy.setAttribute('data-kind', row.getAttribute('data-kind'));
+      }
+      dirty = true;
+      if (act === 'up' || act === 'down') btn.focus();
+    });
+    if (start) start.addEventListener('change', syncDates);
+    if (end) end.addEventListener('change', syncDates);
+    syncDates();
+  }
+
+
   var main = document.querySelector('.a-event-form');
   if (main) {
     main.addEventListener('input', function () { dirty = true; });

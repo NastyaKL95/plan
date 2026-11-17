@@ -176,6 +176,7 @@ $noscriptList = $upcoming !== [] ? $upcoming : array_slice(array_reverse($events
       <h2 id="mTitle"></h2>
       <div class="modal-meta" id="mMeta"></div>
       <div class="modal-text" id="mText"></div>
+      <div class="program" id="mProgram" hidden></div>
       <div class="modal-actions">
         <a class="btn btn-primary" id="mOpen" href="#" target="_blank" rel="noopener">Подробнее</a>
         <a class="btn btn-ghost" id="mIcs" href="#">Добавить в календарь</a>

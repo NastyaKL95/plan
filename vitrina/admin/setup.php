@@ -33,13 +33,9 @@ if ($dbOk && $setupKey !== '' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = admin_password_error($password, (string) ($_POST['password2'] ?? ''));
     }
     if ($error === null) {
-        $prefix = (string) vitrina_config()['table_prefix'];
-        $sql = (string) file_get_contents(VITRINA_ROOT . '/install/schema.sql');
-        $sql = str_replace('vitrina_', $prefix, (string) preg_replace('~^--.*$~m', '', $sql));
-        foreach (array_filter(array_map('trim', explode(";\n", $sql))) as $statement) {
-            vitrina_db()->exec($statement);
-        }
+        admin_run_sql_file('schema.sql');
         if (!admin_has_admins()) {
+            admin_run_sql_file('seed.sql');
             vitrina_db()->prepare('INSERT INTO ' . vitrina_table('admins') . ' (email, name, password_hash, created_at) VALUES (?, ?, ?, ?)')
                 ->execute([$form['email'], $form['name'], password_hash($password, PASSWORD_DEFAULT), vitrina_now()]);
             admin_login((int) vitrina_db()->lastInsertId());

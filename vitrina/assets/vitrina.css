@@ -270,6 +270,52 @@ h2 { margin: 0; font-size: clamp(1.5rem, 2.6vw, 2rem); letter-spacing: -0.02em; 
 .modal-text { color: var(--muted); font-size: 0.97rem; }
 .modal-text p { margin: 0 0 10px; }
 .modal-actions { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 4px; }
+.modal.has-program { width: min(940px, 100% - 24px); }
+
+/* Программа события */
+.program { border-top: 1px solid var(--line); padding-top: 18px; display: grid; gap: 12px; }
+.program h3 { margin: 0; font-size: 1.15rem; }
+.program-days { display: flex; gap: 6px; flex-wrap: wrap; }
+.program-days button {
+  padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface);
+  font-weight: 600; font-size: 0.88rem; cursor: pointer; color: var(--muted);
+}
+.program-days button[aria-selected="true"] { background: var(--c, var(--primary)); border-color: var(--c, var(--primary)); color: #fff; }
+.program-day { display: grid; gap: 10px; }
+.slot { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 14px; }
+.slot-time { padding-top: 12px; display: grid; align-content: start; line-height: 1.2; }
+.slot-time b { font-size: 1.05rem; }
+.slot-time small { color: var(--muted); font-size: 0.8rem; }
+.slot-break .slot-time { padding-top: 0; color: var(--muted); font-size: 0.88rem; font-weight: 600; }
+.slot-break .slot-body {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; padding: 6px 12px; border-radius: 10px;
+  background: repeating-linear-gradient(135deg, var(--surface-2) 0 8px, transparent 8px 16px); color: var(--muted); font-size: 0.92rem;
+}
+.slot-par { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 2px 0 8px; }
+.tracks { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.sess {
+  position: relative; padding: 12px 14px 14px; border-radius: 14px; background: var(--surface-2);
+  border-left: 3px solid color-mix(in srgb, var(--c, var(--primary)) 70%, transparent); display: grid; gap: 6px; align-content: start;
+}
+.sess-plenary { background: color-mix(in srgb, var(--c, var(--primary)) 9%, var(--surface-2)); border-left-color: var(--c, var(--primary)); }
+.sess.is-live { box-shadow: 0 0 0 2px var(--primary); }
+.sess h4 { margin: 0; font-size: 0.98rem; line-height: 1.3; }
+.sess-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.sess-tags:empty { display: none; }
+.sess-tag, .sess-live, .sess-time { font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.sess-tag { background: color-mix(in srgb, var(--c, var(--primary)) 16%, transparent); color: var(--c, var(--primary)); }
+.sess-time { background: var(--surface); color: var(--muted); }
+.sess-live { background: var(--primary); color: #fff; animation: live 1.6s ease-in-out infinite; }
+@keyframes live { 50% { opacity: 0.6; } }
+.sess-meta { display: flex; gap: 8px; align-items: flex-start; color: var(--muted); font-size: 0.86rem; }
+.sess-meta svg { flex: none; margin-top: 2px; }
+.sess-meta small { display: block; font-size: 0.74rem; }
+.sess-desc { margin: 0; font-size: 0.88rem; color: var(--muted); }
+.sess-desc a { color: var(--primary-dark); word-break: break-word; }
+.btn-join { justify-self: start; margin-top: 4px; background: var(--primary); color: #fff; border-color: var(--primary); }
+.btn-join:hover { background: var(--primary-dark); }
+.btn-join svg { margin-right: 2px; }
+@media (prefers-color-scheme: dark) { .sess-tag { color: color-mix(in srgb, var(--c, var(--primary)) 70%, #fff); } }
 
 footer { margin-top: 24px; padding: 28px 0 36px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
 footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
@@ -300,6 +346,9 @@ footer .admin-link { color: var(--muted); }
   .cal-bar h3 { min-width: 0; flex: 1; font-size: 1.05rem; }
   .modal { border-radius: 22px; }
   .modal-body { padding: 20px; }
+  .slot { grid-template-columns: 1fr; gap: 4px; }
+  .slot-time { padding-top: 0; display: flex; gap: 8px; align-items: baseline; }
+  .tracks { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
