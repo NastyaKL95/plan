@@ -11,6 +11,9 @@ try {
 } catch (Throwable $e) {
     $ecoUser = null;
 }
+if ($ecoUser && planner_login_block_message($ecoUser) !== null) {
+    $ecoUser = null;
+}
 $cfgName = trim((string) (app_config()['app']['name'] ?? ''));
 $vectorName = $cfgName !== '' ? $cfgName : 'Вектор';
 $vectorUrl = planner_url('/index.php');
@@ -30,6 +33,55 @@ if ($ecoUser) {
     $n = trim((string) ($ecoUser['name'] ?? ''));
     $userInitial = $n !== '' ? mb_strtoupper(mb_substr($n, 0, 1, 'UTF-8'), 'UTF-8') : '•';
 }
+$ecoStats = null;
+$ecoGreetName = '';
+$ecoGreeting = 'Добрый день';
+if ($ecoUser) {
+    $uid = (int) $ecoUser['id'];
+    $orgId = (int) ($ecoUser['organization_id'] ?? 0);
+    $workYear = (int) ($ecoUser['organization_work_year'] ?? date('Y'));
+    $active = "status NOT IN ('done','cancelled')";
+    try {
+        $yearSql = planner_table_has_column('tasks', 'work_year') ? ' AND work_year = ?' : '';
+        $params = $yearSql !== '' ? [$uid, $orgId, $workYear] : [$uid, $orgId];
+        $st = db()->prepare(
+            "SELECT COALESCE(SUM($active), 0) AS active,
+                    COALESCE(SUM($active AND due_date IS NOT NULL AND due_date < NOW()), 0) AS overdue
+               FROM tasks WHERE assignee_id = ? AND organization_id = ?$yearSql"
+        );
+        $st->execute($params);
+        $mine = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+        $st = db()->prepare("SELECT COUNT(*) FROM tasks WHERE author_id = ? AND organization_id = ? AND status = 'review'$yearSql");
+        $st->execute($params);
+        $review = (int) $st->fetchColumn();
+        $unread = 0;
+        if (planner_table_exists('notifications')) {
+            $st = db()->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND organization_id = ? AND read_at IS NULL');
+            $st->execute([$uid, $orgId]);
+            $unread = (int) $st->fetchColumn();
+        }
+        $ecoStats = [
+            ['n' => (int) ($mine['active'] ?? 0), 'label' => 'в работе у меня', 'href' => planner_url('/tasks.php?assignee_id=' . $uid . '&report_active=1'), 'tone' => ''],
+            ['n' => (int) ($mine['overdue'] ?? 0), 'label' => 'просрочено', 'href' => planner_url('/tasks.php?assignee_id=' . $uid . '&report_overdue=1'), 'tone' => 'warn'],
+            ['n' => $review, 'label' => 'ждут моей проверки', 'href' => planner_url('/tasks.php?status=review'), 'tone' => ''],
+            ['n' => $unread, 'label' => 'новых уведомлений', 'href' => planner_url('/notifications.php'), 'tone' => ''],
+        ];
+    } catch (Throwable $e) {
+        $ecoStats = null;
+    }
+    $parts = preg_split('/\s+/u', trim((string) ($ecoUser['name'] ?? ''))) ?: [];
+    $ecoGreetName = count($parts) === 3 ? $parts[1] . ' ' . $parts[2] : implode(' ', $parts);
+    $hour = (int) (new DateTimeImmutable('now', new DateTimeZone('Asia/Chita')))->format('G');
+    $ecoGreeting = $hour < 5 ? 'Доброй ночи' : ($hour < 12 ? 'Доброе утро' : ($hour < 18 ? 'Добрый день' : 'Добрый вечер'));
+}
+$ecoActions = [
+    ['title' => 'Мои задачи', 'text' => 'Список, канбан и «Мой план» на неделю', 'href' => planner_url('/tasks.php'), 'color' => '#2fc06e', 'icon' => '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'],
+    ['title' => 'План и отчёт', 'text' => 'Индивидуальный план и отчёт преподавателя', 'href' => planner_url('/reports.php'), 'color' => '#8b5cf6', 'icon' => '<path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 4-5"/>'],
+    ['title' => 'Документы', 'text' => 'Приказы, положения, регламенты, инструкции', 'href' => planner_url('/documents.php'), 'color' => '#f59e0b', 'icon' => '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/>'],
+    ['title' => 'Проекты отдела', 'text' => 'Проекты и портфели подразделения', 'href' => planner_url('/projects.php'), 'color' => '#2b8cff', 'icon' => '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'],
+    ['title' => 'Свободная аудитория', 'text' => 'Занятость помещений и расписание', 'href' => 'https://af.zabedu.ru/', 'color' => '#14b8a6', 'icon' => '<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-5h6v5"/>', 'ext' => true],
+    ['title' => 'Анонс мероприятия', 'text' => 'Как событие видят педагоги на витрине', 'href' => 'https://eventt.zabedu.ru/', 'color' => '#1d7fe0', 'icon' => '<rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18"/><path d="M8 14h3M8 17.5h7"/>', 'ext' => true],
+];
 header('Content-Type: text/html; charset=UTF-8');
 ?>
 <!DOCTYPE html>
@@ -37,7 +89,7 @@ header('Content-Type: text/html; charset=UTF-8');
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Экосистема ИРО Забайкальского края</title>
+  <title>Экосистема ИРО — рабочие сервисы сотрудников</title>
   <meta name="description" content="Цифровые сервисы Института развития образования Забайкальского края: портал, обучение, конкурсы, мероприятия, методическая поддержка и планирование работы.">
   <meta property="og:title" content="Экосистема ИРО Забайкальского края">
   <meta property="og:description" content="Все цифровые сервисы института в одном месте.">
@@ -154,6 +206,50 @@ header('Content-Type: text/html; charset=UTF-8');
     .stats { display: flex; gap: 28px; margin-top: 36px; flex-wrap: wrap; }
     .stat b { display: block; font-size: 1.6rem; letter-spacing: -0.02em; }
     .stat span { color: var(--muted); font-size: 0.88rem; }
+    .btn-vector { background: var(--primary); color: #fff; padding: 9px 22px 9px 9px; box-shadow: 0 8px 22px rgba(47, 192, 110, 0.32); }
+    .btn-vector svg { display: block; border-radius: 999px; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55); }
+    .btn-vector svg rect { rx: 16px; }
+    .btn-vector:hover { background: var(--primary-dark); transform: translateY(-1px); }
+
+    /* Моя сводка */
+    .my-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 32px; max-width: 580px; }
+    .my-stat {
+      display: flex; flex-direction: column; gap: 2px; padding: 14px 14px 12px;
+      border-radius: 16px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow);
+      text-decoration: none; transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    }
+    .my-stat:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); border-color: rgba(47, 192, 110, 0.45); }
+    .my-stat b { font-size: 1.7rem; line-height: 1.1; letter-spacing: -0.02em; }
+    .my-stat span { font-size: 0.8rem; color: var(--muted); line-height: 1.25; }
+    .my-stat.is-warn { border-color: rgba(239, 79, 107, 0.45); }
+    .my-stat.is-warn b { color: #e23d5b; }
+
+    /* Быстрые действия */
+    .quick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .qa {
+      --c: #2fc06e;
+      position: relative; display: flex; align-items: center; gap: 14px; padding: 16px 18px;
+      border-radius: 18px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow);
+      text-decoration: none; transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+    }
+    .qa:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); border-color: color-mix(in srgb, var(--c) 45%, transparent); }
+    .qa-ico { flex: none; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
+    .qa-body { min-width: 0; }
+    .qa-body b { display: block; font-size: 1rem; }
+    .qa-body small { display: block; color: var(--muted); font-size: 0.84rem; line-height: 1.35; }
+    .qa-ext { position: absolute; top: 12px; right: 12px; color: var(--muted); opacity: 0.7; }
+
+    /* Помощь */
+    .help {
+      display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+      margin-top: 28px; padding: 22px 26px; border-radius: var(--radius);
+      background: linear-gradient(120deg, rgba(47, 192, 110, 0.12), rgba(43, 140, 255, 0.10));
+      border: 1px solid rgba(47, 192, 110, 0.25);
+    }
+    .help-text { max-width: 640px; }
+    .help-text b { display: block; font-size: 1.05rem; margin-bottom: 4px; }
+    .help-text span { color: var(--muted); }
+    .help-links { display: flex; gap: 10px; flex-wrap: wrap; }
 
     /* Схема экосистемы */
     .orbit { position: relative; aspect-ratio: 1; width: 100%; max-width: 500px; justify-self: center; }
@@ -293,11 +389,13 @@ header('Content-Type: text/html; charset=UTF-8');
       .orbit { max-width: 420px; }
       .grid, .paths { grid-template-columns: repeat(2, 1fr); }
       .showcase { grid-template-columns: 1fr; padding: 32px; }
+      .quick { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .cal { justify-self: stretch; max-width: none; }
     }
     @media (max-width: 620px) {
       .hero { padding: 40px 0 32px; }
-      .grid, .paths { grid-template-columns: 1fr; }
+      .grid, .paths, .quick { grid-template-columns: 1fr; }
+      .my-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .showcase { padding: 24px; border-radius: 22px; }
       .brand small { display: none; }
       .top-link span { display: none; }
@@ -342,20 +440,33 @@ header('Content-Type: text/html; charset=UTF-8');
     <section class="hero">
       <div class="wrap">
         <div>
-          <span class="eyebrow">Институт развития образования</span>
-          <h1>Экосистема <span class="accent">ИРО Забайкальского края</span></h1>
-          <p class="lead">Все цифровые сервисы института в одном месте: обучение и методическая поддержка, конкурсы и мероприятия, планирование работы и учёт аудиторий.</p>
+          <span class="eyebrow">Для сотрудников ИРО Забайкальского края</span>
+<?php if ($ecoUser): ?>
+          <h1><?= $h($ecoGreeting) ?>,<br><span class="accent"><?= $h($ecoGreetName) ?></span></h1>
+          <p class="lead">Ваш рабочий день в одном месте. «<?= $h($vectorName) ?>» — для задач, плана и отчёта, соседние сервисы института — для аудиторий, мероприятий, курсов и заявок.</p>
+<?php else: ?>
+          <h1>Рабочее пространство <span class="accent">сотрудника ИРО</span></h1>
+          <p class="lead">Задачи и отчёты, аудитории, мероприятия, курсы и заявки — все рабочие сервисы института в одном месте. Начните со входа в «<?= $h($vectorName) ?>»: там ваши задачи, план и отчёт.</p>
+<?php endif; ?>
           <div class="hero-actions">
-            <a class="btn btn-primary" href="#services">Все сервисы
+            <a class="btn btn-vector" href="<?= $h($ecoUser ? $vectorUrl : planner_url('/login.php')) ?>"><?= planner_vector_mark_svg(22) ?><?= $ecoUser ? 'Открыть' : 'Войти в' ?> <?= $h($vectorName) ?></a>
+            <a class="btn btn-ghost" href="#services">Все сервисы
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
             </a>
-            <a class="btn btn-ghost" href="https://eventt.zabedu.ru/" target="_blank" rel="noopener">Витрина мероприятий</a>
           </div>
+<?php if ($ecoStats): ?>
+          <div class="my-stats" aria-label="Моя сводка">
+<?php foreach ($ecoStats as $st): ?>
+            <a class="my-stat<?= $st['tone'] === 'warn' && $st['n'] > 0 ? ' is-warn' : '' ?>" href="<?= $h($st['href']) ?>"><b><?= (int) $st['n'] ?></b><span><?= $h($st['label']) ?></span></a>
+<?php endforeach; ?>
+          </div>
+<?php elseif (!$ecoUser): ?>
           <div class="stats">
-            <div class="stat"><b>7</b><span>сервисов</span></div>
-            <div class="stat"><b>1</b><span>образовательное пространство</span></div>
-            <div class="stat"><b>24/7</b><span>доступ онлайн</span></div>
+            <div class="stat"><b>7</b><span>рабочих сервисов</span></div>
+            <div class="stat"><b>1</b><span>вход для задач и отчётов</span></div>
+            <div class="stat"><b>MAX</b><span>уведомления о задачах</span></div>
           </div>
+<?php endif; ?>
         </div>
 
         <div class="orbit" aria-label="Схема экосистемы: сервисы вокруг института">
@@ -379,13 +490,33 @@ header('Content-Type: text/html; charset=UTF-8');
       </div>
     </section>
 
+    <section aria-labelledby="quick-title">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <h2 id="quick-title">Быстрые действия</h2>
+            <p><?= $ecoUser ? 'То, что нужно каждый день.' : 'Разделы Вектора откроются после входа под рабочей почтой @iro75.ru.' ?></p>
+          </div>
+        </div>
+        <div class="quick">
+<?php foreach ($ecoActions as $a): ?>
+          <a class="qa reveal" style="--c:<?= $h($a['color']) ?>" href="<?= $h($a['href']) ?>"<?= !empty($a['ext']) ? ' target="_blank" rel="noopener"' : '' ?>>
+            <span class="qa-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><?= $a['icon'] ?></svg></span>
+            <span class="qa-body"><b><?= $h($a['title']) ?></b><small><?= $h($a['text']) ?></small></span>
+            <?php if (!empty($a['ext'])): ?><span class="qa-ext" title="Откроется в новой вкладке"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M8 7h9v9"/></svg></span><?php endif; ?>
+          </a>
+<?php endforeach; ?>
+        </div>
+      </div>
+    </section>
+
     <section aria-labelledby="showcase-title">
       <div class="wrap">
         <a class="showcase reveal" href="https://eventt.zabedu.ru/" target="_blank" rel="noopener">
           <div>
             <span class="tag-white">Витрина</span>
             <h3 id="showcase-title">Календарь мероприятий #educationlife</h3>
-            <p>Главная витрина событий: семинары, конференции, конкурсы и курсы для педагогов края. Смотрите, что проходит сегодня, и выбирайте события на месяц вперёд.</p>
+            <p>Здесь педагоги края находят семинары, конференции, конкурсы и курсы института. Проверьте, как выглядит анонс мероприятия вашего отдела, и поделитесь ссылкой с участниками.</p>
             <span class="go">Открыть витрину
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
             </span>
@@ -408,14 +539,15 @@ header('Content-Type: text/html; charset=UTF-8');
       <div class="wrap">
         <div class="section-head">
           <div>
-            <h2 id="services-title">Сервисы экосистемы</h2>
-            <p>Нажмите на карточку, чтобы перейти на сайт. Сервисы открываются в новой вкладке.</p>
+            <h2 id="services-title">Сервисы для работы</h2>
+            <p>Выберите направление работы. Внешние сервисы открываются в новой вкладке.</p>
           </div>
-          <div class="chips" role="group" aria-label="Фильтр по аудитории">
+          <div class="chips" role="group" aria-label="Фильтр по направлению работы">
             <button type="button" class="chip" data-filter="all" aria-pressed="true">Все</button>
-            <button type="button" class="chip" data-filter="teacher" aria-pressed="false">Педагогам</button>
-            <button type="button" class="chip" data-filter="staff" aria-pressed="false">Сотрудникам ИРО</button>
+            <button type="button" class="chip" data-filter="plan" aria-pressed="false">Планирование</button>
+            <button type="button" class="chip" data-filter="events" aria-pressed="false">Мероприятия</button>
             <button type="button" class="chip" data-filter="learn" aria-pressed="false">Обучение</button>
+            <button type="button" class="chip" data-filter="info" aria-pressed="false">Информирование</button>
           </div>
         </div>
 
@@ -444,37 +576,49 @@ header('Content-Type: text/html; charset=UTF-8');
       <div class="wrap">
         <div class="section-head">
           <div>
-            <h2 id="paths-title">С чего начать</h2>
-            <p>Короткие маршруты для разных задач.</p>
+            <h2 id="paths-title">Рабочие сценарии</h2>
+            <p>Как сервисы экосистемы складываются в обычные задачи института.</p>
           </div>
         </div>
         <div class="paths">
           <div class="path reveal">
-            <h3>Педагогу</h3>
-            <p>Учиться, участвовать и делиться опытом.</p>
+            <h3>Провести мероприятие</h3>
+            <p>Семинар, конференция или вебинар отдела.</p>
             <ol>
-              <li><span>Найдите событие на <a href="https://eventt.zabedu.ru/" target="_blank" rel="noopener">витрине мероприятий</a></span></li>
-              <li><span>Пройдите курс на <a href="https://do75.zabedu.ru/" target="_blank" rel="noopener">дистанционной платформе</a></span></li>
-              <li><span>Подайте заявку на <a href="https://konkurs.zabedu.ru/" target="_blank" rel="noopener">конкурс или проект</a></span></li>
+              <li><span>Заведите задачу с чек-листом подготовки в разделе <a href="<?= $h(planner_url('/tasks.php')) ?>">«Задачи»</a></span></li>
+              <li><span>Подберите помещение в <a href="https://af.zabedu.ru/" target="_blank" rel="noopener">аудиторном фонде</a></span></li>
+              <li><span>Проверьте анонс на <a href="https://eventt.zabedu.ru/" target="_blank" rel="noopener">витрине мероприятий</a></span></li>
+              <li><span>После мероприятия отметьте задачу выполненной и приложите материалы</span></li>
             </ol>
           </div>
           <div class="path reveal">
-            <h3>Сотруднику ИРО</h3>
-            <p>Планировать работу и готовить мероприятия.</p>
+            <h3>Запустить курс</h3>
+            <p>Повышение квалификации педагогов.</p>
             <ol>
-              <li><span>Ведите задачи и отчёты в <a href="<?= $h($vectorUrl) ?>">«<?= $h($vectorName) ?>»</a></span></li>
-              <li><span>Посмотрите занятость помещений в <a href="https://af.zabedu.ru/" target="_blank" rel="noopener">аудиторном фонде</a></span></li>
-              <li><span>Проверьте анонс события на <a href="https://eventt.zabedu.ru/" target="_blank" rel="noopener">витрине</a></span></li>
+              <li><span>Отметьте в задаче «Учебную работу» и часы — они попадут в план и отчёт</span></li>
+              <li><span>Разместите курс на <a href="https://do75.zabedu.ru/" target="_blank" rel="noopener">дистанционной платформе</a></span></li>
+              <li><span>Добавьте материалы в <a href="https://metodnav.zabedu.ru/" target="_blank" rel="noopener">методический навигатор</a></span></li>
             </ol>
           </div>
           <div class="path reveal">
-            <h3>Образовательной организации</h3>
-            <p>Быть в курсе и получать поддержку.</p>
+            <h3>Сдать план и отчёт</h3>
+            <p>Индивидуальный план и отчёт преподавателя.</p>
             <ol>
-              <li><span>Следите за новостями на <a href="https://zabedu.ru/" target="_blank" rel="noopener">портале образования</a></span></li>
-              <li><span>Используйте <a href="https://metodnav.zabedu.ru/" target="_blank" rel="noopener">методический навигатор</a></span></li>
-              <li><span>Направляйте педагогов на <a href="https://do75.zabedu.ru/" target="_blank" rel="noopener">курсы</a></span></li>
+              <li><span>Проверьте виды работы и часы в своих задачах</span></li>
+              <li><span>Выгрузите «План» или «Отчёт» в разделе <a href="<?= $h(planner_url('/reports.php')) ?>">«Отчёты»</a></span></li>
+              <li><span>Положения и формы — в разделе <a href="<?= $h(planner_url('/documents.php')) ?>">«Документы»</a></span></li>
             </ol>
+          </div>
+        </div>
+
+        <div class="help reveal">
+          <div class="help-text">
+            <b>Нужна помощь с Вектором?</b>
+            <span>Инструкция пользователя лежит в разделе «Документы», а уведомления о задачах можно получать в MAX: укажите ID чата в профиле.</span>
+          </div>
+          <div class="help-links">
+            <a class="btn btn-ghost" href="<?= $h(planner_url('/documents.php?q=' . rawurlencode('Инструкция'))) ?>">Инструкция</a>
+            <a class="btn btn-ghost" href="https://max.ru/irozabkrai75_bot" target="_blank" rel="noopener">Бот в MAX</a>
           </div>
         </div>
       </div>
