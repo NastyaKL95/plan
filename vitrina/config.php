@@ -18,5 +18,5 @@ return array_replace_recursive([
     'setup_key' => '',
     'upload_max_mb' => 8,
     'site_name' => 'Витрина событий ИРО Забайкальского края',
-    'ecosystem_url' => 'https://planiro75.ru/public/ecosystem.html',
+    'ecosystem_url' => 'https://planiro75.ru/',
 ], $overrides);
