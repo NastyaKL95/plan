@@ -76,7 +76,7 @@ function planner_maintenance_is_enabled(int $orgId): bool
 
 function planner_maintenance_default_message(): string
 {
-    return 'Идут технические работы. Планировщик скоро снова будет доступен.';
+    return 'Идут технические работы. Вектор скоро снова будет доступен.';
 }
 
 function planner_maintenance_clip_message(string $raw): string

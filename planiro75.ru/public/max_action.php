@@ -25,7 +25,7 @@ if (!empty($row['used_at'])) {
     planner_max_action_page('Ссылка уже использована', 'Это действие уже выполнено.');
 }
 if (strtotime((string) $row['expires_at']) < time()) {
-    planner_max_action_page('Срок ссылки истёк', 'Откройте задачу в планировщике и измените статус там.');
+    planner_max_action_page('Срок ссылки истёк', 'Откройте задачу в Векторе и измените статус там.');
 }
 
 $orgId = (int) ($row['organization_id'] ?? 0);
@@ -74,7 +74,7 @@ if ($fromStatus === $toStatus) {
     planner_max_action_page('Статус уже установлен', 'Задача «' . $title . '» уже ' . ($toStatus === 'done' ? 'выполнена.' : 'в работе.'));
 }
 if (!planner_task_status_transition_allowed($fromStatus, $toStatus)) {
-    planner_max_action_page('Действие недоступно', 'Из текущего статуса задачу так перевести нельзя. Откройте её в планировщике.');
+    planner_max_action_page('Действие недоступно', 'Из текущего статуса задачу так перевести нельзя. Откройте её в Векторе.');
 }
 $question = $action === 'take'
     ? 'Взять задачу в работу?'
@@ -125,7 +125,8 @@ function planner_max_action_page(string $title, string $message, int $status = 2
     $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
     $body = $messageIsHtml ? $message : '<p>' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</p>';
     $css = htmlspecialchars(planner_url('/assets/css/app.css'), ENT_QUOTES, 'UTF-8');
-    $app = htmlspecialchars((string) (app_config()['app']['name'] ?? 'Planner'), ENT_QUOTES, 'UTF-8');
+    $appName = trim((string) (app_config()['app']['name'] ?? ''));
+    $app = htmlspecialchars($appName !== '' ? $appName : 'Вектор', ENT_QUOTES, 'UTF-8');
     echo '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">'
         . '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
         . '<title>' . $safeTitle . ' — ' . $app . '</title>'

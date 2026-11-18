@@ -25,7 +25,7 @@ if ($to === '' || !planner_mail_address_ok($to)) {
     json_response(['ok' => false, 'error' => 'bad_email'], 422);
 }
 
-$subject = 'Тест SMTP из Planner';
+$subject = 'Тест SMTP из Вектора';
 $message = "Это тестовое письмо.\n\n"
     . "Организация ID: {$orgId}\n"
     . "Пользователь ID: {$userId}\n"

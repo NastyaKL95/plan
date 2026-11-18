@@ -46,7 +46,7 @@ layout_start($user, 'План года', 'plan_year');
       <span>Включить режим обслуживания</span>
     </label>
     <label class="field-label" for="maintenanceMessage">Текст для сотрудников</label>
-    <textarea id="maintenanceMessage" class="input-block" rows="3" maxlength="500" placeholder="Идут технические работы. Планировщик скоро снова будет доступен."></textarea>
+    <textarea id="maintenanceMessage" class="input-block" rows="3" maxlength="500" placeholder="Идут технические работы. Вектор скоро снова будет доступен."></textarea>
     <div class="plan-year-import-actions">
       <button type="button" class="btn btn-primary" id="maintenanceSave">Сохранить</button>
     </div>

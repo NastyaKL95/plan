@@ -17,7 +17,7 @@ return [
         'slow_sql_explain_ms' => (int) (getenv('PLANNER_DB_SLOW_SQL_EXPLAIN_MS') ?: 900),
     ],
     'app' => [
-        'name' => '',
+        'name' => 'Вектор',
         'session_name' => 'planner_sess',
         /** Полный URL сайта без слэша в конце (для ссылок в MAX и др.): https://planner.example.ru */
         'public_origin' => (string) (getenv('PLANNER_PUBLIC_ORIGIN') ?: 'https://planiro75.ru'),
@@ -62,7 +62,7 @@ return [
     'mail' => [
         'enabled' => in_array(strtolower((string) getenv('PLANNER_MAIL_ENABLED')), ['1', 'true', 'yes', 'on'], true),
         'from_email' => (string) (getenv('PLANNER_MAIL_FROM_EMAIL') ?: 'do@iro75.ru'),
-        'from_name' => (string) (getenv('PLANNER_MAIL_FROM_NAME') ?: 'Planner'),
+        'from_name' => (string) (getenv('PLANNER_MAIL_FROM_NAME') ?: 'Вектор'),
         'smtp_host' => (string) (getenv('PLANNER_SMTP_HOST') ?: 'smtp.yandex.ru'),
         'smtp_port' => (int) (getenv('PLANNER_SMTP_PORT') ?: 465),
         'smtp_encryption' => (string) (getenv('PLANNER_SMTP_ENCRYPTION') ?: 'ssl'), // ssl|tls

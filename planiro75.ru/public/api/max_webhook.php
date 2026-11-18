@@ -414,7 +414,7 @@ if (!$secretMatched) {
         'stored_secrets' => count($secretRows),
         'stored_lens' => $storedLens,
         'provided_len' => strlen($secretProvided),
-        'hint' => 'MAX и Planner должны использовать один secret — «Зарегистрировать webhook» в MAX мониторинге.',
+        'hint' => 'MAX и Вектор должны использовать один secret — «Зарегистрировать webhook» в MAX мониторинге.',
     ]);
     json_response(['ok' => false, 'error' => 'forbidden'], 403);
 }
@@ -532,7 +532,7 @@ if (!$bound) {
     if (planner_table_exists('organizations')) {
         $replyOrgId = (int) (db()->query('SELECT id FROM organizations ORDER BY id LIMIT 1')->fetchColumn() ?: 0);
     }
-    $unboundMsg = "👋 Привет! Я бот Planner.\n"
+    $unboundMsg = "👋 Привет! Я бот Вектора.\n"
         . "Для личного чата в профиле укажите MAX chat_id диалога"
         . ($recipientChatId !== '' ? " (сейчас в webhook: {$recipientChatId})" : '')
         . ".\n"
@@ -544,7 +544,7 @@ if (!$bound) {
     planner_max_webhook_ok('unbound', [
         'chat_id' => $replyChat,
         'reply_sent' => $replySent,
-        'hint' => 'Привяжите max_chat_id=' . $hintId . ' в профиле Planner',
+        'hint' => 'Привяжите max_chat_id=' . $hintId . ' в профиле Вектора',
     ]);
 }
 $u = $bound['user'];
@@ -564,7 +564,7 @@ if ($command === '/start') {
     $prefs = planner_max_user_prefs($orgId, $userId);
     $boundChat = trim((string) ($u['max_chat_id'] ?? ''));
     $msg = "👋 Привет, {$name}!\n"
-        . "Связь с Planner активна.\n"
+        . "Связь с Вектором активна.\n"
         . "Чат для команд: {$chatId}\n"
         . ($boundChat !== '' && $boundChat !== $chatId ? "В профиле указан другой chat_id ({$boundChat}) — для команд лучше указать {$chatId}.\n" : '')
         . "MAX уведомления: " . (!empty($prefs['enabled']) ? 'включены' : 'выключены') . "\n"
@@ -573,7 +573,7 @@ if ($command === '/start') {
     planner_max_webhook_ok('start', ['chat_id' => $chatId]);
 }
 if ($command === '/help') {
-    $msg = "ℹ Команды Planner-бота\n"
+    $msg = "ℹ Команды бота Вектора\n"
         . "/start — статус привязки\n"
         . "/my — мои активные задачи\n"
         . "/task <id> — карточка задачи\n"

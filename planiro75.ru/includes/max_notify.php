@@ -207,7 +207,7 @@ function planner_max_flush_due_digests(int $limitUsers = 200): int
             $short = function_exists('mb_substr') ? mb_substr($txt, 0, 120, 'UTF-8') : substr($txt, 0, 120);
             $lines[] = '• [' . $ev . '] ' . ($tid > 0 ? ('#' . $tid . ' ') : '') . $short;
         }
-        $msg = "🧾 Дайджест Planner (" . count($rows) . ")\n" . implode("\n", $lines);
+        $msg = "🧾 Дайджест Вектора (" . count($rows) . ")\n" . implode("\n", $lines);
         if (!planner_max_enqueue_event($orgId, $userId, 0, 'digest_summary', $msg, ['count' => count($rows)], 60)) {
             continue;
         }

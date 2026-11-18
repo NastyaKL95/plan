@@ -89,7 +89,7 @@ function planner_send_mail(string $toEmail, string $subject, string $plainBody):
     $user = trim((string) ($m['smtp_user'] ?? ''));
     $pass = (string) ($m['smtp_pass'] ?? '');
     $fromEmail = trim((string) ($m['from_email'] ?? ''));
-    $fromName = trim((string) ($m['from_name'] ?? 'Planner'));
+    $fromName = trim((string) ($m['from_name'] ?? 'Вектор'));
     $timeout = max(3, (int) ($m['smtp_timeout'] ?? 12));
 
     if ($host === '' || $user === '' || $pass === '' || $fromEmail === '') {
