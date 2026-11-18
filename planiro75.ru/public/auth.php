@@ -278,13 +278,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if ($registerSuccess) {
     $registerSuccessMessage = 'На указанный email отправлена ссылка для подтверждения. После подтверждения администратор назначит вам роль и подразделение.';
 }
+require_once dirname(__DIR__) . '/includes/ecosystem.php';
+$authCfgName = trim((string) (app_config()['app']['name'] ?? ''));
+$authAppName = htmlspecialchars($authCfgName !== '' ? $authCfgName : 'Вектор', ENT_QUOTES, 'UTF-8');
+$authEcoHref = htmlspecialchars(planner_ecosystem_url(), ENT_QUOTES, 'UTF-8');
 ?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><?= $mode === 'register' ? 'Регистрация' : 'Авторизация' ?> — <?= htmlspecialchars(app_config()['app']['name'], ENT_QUOTES, 'UTF-8') ?></title>
+  <title><?= $mode === 'register' ? 'Регистрация' : 'Авторизация' ?> — <?= $authAppName ?></title>
   <?= planner_favicon_head_markup() ?>
   <link rel="stylesheet" href="<?= htmlspecialchars(planner_url('/assets/css/app.css'), ENT_QUOTES, 'UTF-8') ?>">
   <script src="<?= htmlspecialchars(planner_url('/assets/js/bx-custom-select.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
@@ -294,7 +298,11 @@ if ($registerSuccess) {
     <section class="auth-panel auth-panel--form">
       <div class="auth-forms">
         <div class="auth-form-screen<?= $mode === 'login' ? ' is-active' : '' ?>" data-mode="login">
-          <div class="auth-brand auth-brand--mini">Вектор</div>
+          <a class="auth-eco-back" href="<?= $authEcoHref ?>">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 19l-7-7 7-7"/></svg>
+            Экосистема ИРО
+          </a>
+          <div class="auth-brand auth-brand--mini"><?= planner_vector_mark_svg(40, 'auth-brand-mark') ?><span><?= $authAppName ?></span></div>
           <h1 class="auth-title">Авторизация</h1>
           <?php if ($maintenanceOn): ?><p class="auth-hint">Сейчас идёт техническое обслуживание. Войти и работать может только администратор.</p><?php endif; ?>
           <?php if ($loginNotice !== ''): ?><div class="alert alert-success"><?= htmlspecialchars($loginNotice, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
@@ -324,7 +332,11 @@ if ($registerSuccess) {
 
         <?php if ($regPublicOpen): ?>
         <div class="auth-form-screen<?= $mode === 'register' ? ' is-active' : '' ?>" data-mode="register">
-          <div class="auth-brand auth-brand--mini">Вектор</div>
+          <a class="auth-eco-back" href="<?= $authEcoHref ?>">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 19l-7-7 7-7"/></svg>
+            Экосистема ИРО
+          </a>
+          <div class="auth-brand auth-brand--mini"><?= planner_vector_mark_svg(40, 'auth-brand-mark') ?><span><?= $authAppName ?></span></div>
           <h1 class="auth-title">Создать аккаунт</h1>
           <?php if ($registerSuccessMessage !== ''): ?><div class="alert alert-success"><?= htmlspecialchars($registerSuccessMessage, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
             <?php if ($registerError !== ''): ?><div class="alert alert-error"><?= htmlspecialchars($registerError, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>

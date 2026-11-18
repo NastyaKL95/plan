@@ -207,6 +207,37 @@ a:hover {
 .auth-brand--mini {
   font-size: 1.95rem;
   margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.auth-brand-mark {
+  flex: none;
+  border-radius: 11px;
+  box-shadow: 0 8px 20px rgba(47, 192, 110, 0.32);
+}
+
+.auth-eco-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 22px;
+  padding: 6px 12px 6px 9px;
+  border-radius: 999px;
+  background: rgba(47, 192, 110, 0.1);
+  color: #1f9a55;
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.auth-eco-back:hover,
+.auth-eco-back:focus-visible {
+  background: #2fc06e;
+  color: #fff;
+  outline: none;
 }
 
 .auth-title {
@@ -672,6 +703,28 @@ a:hover {
   flex-shrink: 0;
 }
 
+a.bx-ibar-logo {
+  background: transparent;
+  text-decoration: none;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+a.bx-ibar-logo svg {
+  display: block;
+  border-radius: 10px;
+  box-shadow: 0 6px 16px rgba(47, 192, 110, 0.35);
+}
+
+a.bx-ibar-logo:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+
+a.bx-ibar-logo:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
 .bx-ibar-item {
   width: 44px;
   height: 44px;
@@ -854,6 +907,202 @@ a:hover {
   height: 30px;
   object-fit: contain;
   display: block;
+}
+
+/* Меню «Экосистема ИРО» */
+.bx-eco {
+  position: relative;
+}
+
+.bx-eco-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px 0 11px;
+  border: 1px solid rgba(47, 192, 110, 0.35);
+  border-radius: 999px;
+  background: rgba(47, 192, 110, 0.08);
+  color: #1f9a55;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.bx-eco-btn:hover,
+.bx-eco.is-open .bx-eco-btn {
+  background: #2fc06e;
+  border-color: #2fc06e;
+  color: #fff;
+}
+
+.bx-eco-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.bx-eco-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  width: 352px;
+  max-width: calc(100vw - 24px);
+  padding: 10px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 2px 4px rgba(16, 24, 40, 0.05), 0 18px 40px rgba(16, 24, 40, 0.16);
+  z-index: var(--z-user-menu-panel);
+}
+
+.bx-eco-panel[hidden] {
+  display: none !important;
+}
+
+.bx-eco-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 14px;
+  color: #fff;
+  text-decoration: none;
+  background:
+    radial-gradient(260px 120px at 90% 0%, rgba(255, 255, 255, 0.2), transparent 60%),
+    linear-gradient(125deg, #0f7a45 0%, #1fae62 45%, #1d7fe0 100%);
+}
+
+.bx-eco-head svg {
+  flex: none;
+  border-radius: 10px;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
+.bx-eco-head b {
+  display: block;
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.bx-eco-head small {
+  display: block;
+  font-size: 0.76rem;
+  opacity: 0.85;
+}
+
+.bx-eco-head:hover {
+  filter: brightness(1.05);
+}
+
+.bx-eco-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.bx-eco-item {
+  --c: #2fc06e;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 4px 10px;
+  border-radius: 12px;
+  text-decoration: none;
+  color: #15202b;
+  text-align: center;
+  min-width: 0;
+  transition: background 0.15s ease;
+}
+
+.bx-eco-item:hover,
+.bx-eco-item:focus-visible {
+  background: #f3f6f8;
+  outline: none;
+}
+
+.bx-eco-item.is-current {
+  background: rgba(47, 192, 110, 0.1);
+}
+
+.bx-eco-ico {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 14%, #fff);
+  transition: transform 0.15s ease;
+}
+
+.bx-eco-item:hover .bx-eco-ico {
+  transform: translateY(-2px);
+}
+
+.bx-eco-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.bx-eco-dom {
+  font-size: 0.68rem;
+  color: var(--muted);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bx-eco-item.is-current .bx-eco-dom {
+  color: #1f9a55;
+  font-weight: 600;
+}
+
+.bx-eco-all {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  border-top: 1px solid var(--border);
+  color: #1f9a55;
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.bx-eco-all:hover {
+  background: rgba(47, 192, 110, 0.1);
+}
+
+@media (max-width: 1280px) {
+  .bx-eco-btn {
+    width: 38px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .bx-eco-btn-label {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .bx-eco-panel {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+  }
 }
 
 .bx-icon-tool {

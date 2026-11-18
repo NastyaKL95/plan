@@ -4,6 +4,13 @@ declare(strict_types=1);
 require_once dirname(__DIR__) . '/includes/bootstrap.php';
 require_once dirname(__DIR__) . '/includes/layout.php';
 
+// Корень сайта (/ или /public/) — стартовая страница экосистемы; Вектор открывается по /index.php.
+$reqPath = (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
+if ($reqPath !== '' && str_ends_with($reqPath, '/')) {
+    require __DIR__ . '/ecosystem.php';
+    exit;
+}
+
 $user = require_login();
 layout_start($user, 'Обзор', 'dashboard');
 ?>

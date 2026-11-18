@@ -1,3 +1,37 @@
+<?php
+declare(strict_types=1);
+
+require_once dirname(__DIR__) . '/includes/bootstrap.php';
+require_once dirname(__DIR__) . '/includes/ecosystem.php';
+
+$h = static fn (string $v): string => htmlspecialchars($v, ENT_QUOTES, 'UTF-8');
+$ecoUser = null;
+try {
+    $ecoUser = current_user();
+} catch (Throwable $e) {
+    $ecoUser = null;
+}
+$cfgName = trim((string) (app_config()['app']['name'] ?? ''));
+$vectorName = $cfgName !== '' ? $cfgName : 'Вектор';
+$vectorUrl = planner_url('/index.php');
+$ecoServices = planner_ecosystem_services();
+$orbit = [];
+foreach ($ecoServices as $s) {
+    $orbit[] = [
+        'name' => $s['short'],
+        'dom' => $s['key'] === 'portal' ? 'zabedu.ru' : explode('.', $s['domain'])[0],
+        'url' => planner_ecosystem_service_url($s),
+        'internal' => !empty($s['internal']),
+    ];
+}
+$orbitJson = json_encode($orbit, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP);
+$userInitial = '';
+if ($ecoUser) {
+    $n = trim((string) ($ecoUser['name'] ?? ''));
+    $userInitial = $n !== '' ? mb_strtoupper(mb_substr($n, 0, 1, 'UTF-8'), 'UTF-8') : '•';
+}
+header('Content-Type: text/html; charset=UTF-8');
+?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -8,7 +42,7 @@
   <meta property="og:title" content="Экосистема ИРО Забайкальского края">
   <meta property="og:description" content="Все цифровые сервисы института в одном месте.">
   <meta name="theme-color" content="#2fc06e">
-  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <?= planner_favicon_head_markup() ?>
   <style>
     :root {
       --bg: #f3f6f8;
@@ -75,6 +109,15 @@
       transition: background .15s ease, transform .15s ease;
     }
     .top-link:hover { background: var(--primary-dark); }
+    .top-link--vector { padding: 5px 16px 5px 5px; gap: 10px; box-shadow: 0 6px 18px rgba(47, 192, 110, 0.3); }
+    .top-link--vector:hover { transform: translateY(-1px); }
+    .top-link-mark { display: block; border-radius: 999px; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55); }
+    .top-link-mark rect { rx: 16px; }
+    .top-link-avatar {
+      display: grid; place-items: center; width: 26px; height: 26px; margin: 0 -10px 0 2px;
+      border-radius: 50%; background: #fff; color: var(--primary-dark);
+      font-style: normal; font-size: 0.78rem; font-weight: 700;
+    }
 
     /* Первый экран */
     .hero { position: relative; padding: 72px 0 56px; }
@@ -122,6 +165,8 @@
     .orbit .node text { font: 600 11px var(--font); fill: var(--text); text-anchor: middle; }
     .orbit .node .dom { font-weight: 500; font-size: 9px; fill: var(--muted); }
     .orbit .node a:hover circle, .orbit .node a:focus circle { stroke: var(--primary); stroke-width: 2; }
+    .orbit .node--home circle { fill: var(--primary); stroke: var(--primary); }
+    .orbit .node--home text, .orbit .node--home .dom { fill: #fff; }
     .orbit .hub circle { fill: url(#hubGrad); }
     .orbit .hub text { fill: #fff; font: 800 22px var(--font); text-anchor: middle; }
     .orbit .hub .sub { font: 600 9.5px var(--font); letter-spacing: 0.08em; }
@@ -194,6 +239,13 @@
     .card:hover::before { opacity: 1; }
     .card:focus-visible, .showcase:focus-visible, .btn:focus-visible, .chip:focus-visible, .top-link:focus-visible { outline: 3px solid rgba(47, 192, 110, 0.6); outline-offset: 3px; }
     .card-top { display: flex; align-items: center; justify-content: space-between; }
+    .card-top .here {
+      margin: 0 10px 0 auto; padding: 4px 10px; border-radius: 999px;
+      background: color-mix(in srgb, var(--c) 14%, transparent); color: var(--primary-dark);
+      font-size: 0.74rem; font-weight: 700;
+    }
+    @media (prefers-color-scheme: dark) { .card-top .here { color: #6fe0a0; } }
+    .card--home { border-color: color-mix(in srgb, var(--c) 45%, transparent); }
     .icon {
       width: 52px; height: 52px; border-radius: 15px; display: grid; place-items: center;
       background: color-mix(in srgb, var(--c) 14%, transparent); color: var(--c);
@@ -249,6 +301,8 @@
       .showcase { padding: 24px; border-radius: 22px; }
       .brand small { display: none; }
       .top-link span { display: none; }
+      .top-link--vector { padding: 5px; }
+      .top-link-avatar { margin-right: 0; }
       .stats { gap: 20px; }
     }
     @media (prefers-reduced-motion: reduce) {
@@ -269,10 +323,18 @@
         </svg>
         <span>ИРО Забайкальского края<small>Цифровая экосистема</small></span>
       </a>
-      <a class="top-link" href="https://planiro75.ru/">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>
-        <span>Войти в Планировщик</span>
+<?php if ($ecoUser): ?>
+      <a class="top-link top-link--vector" href="<?= $h($vectorUrl) ?>" title="Открыть <?= $h($vectorName) ?>">
+        <?= planner_vector_mark_svg(26, 'top-link-mark') ?>
+        <span>Открыть <?= $h($vectorName) ?></span>
+        <i class="top-link-avatar" aria-hidden="true"><?= $h($userInitial) ?></i>
       </a>
+<?php else: ?>
+      <a class="top-link top-link--vector" href="<?= $h(planner_url('/login.php')) ?>">
+        <?= planner_vector_mark_svg(26, 'top-link-mark') ?>
+        <span>Войти в <?= $h($vectorName) ?></span>
+      </a>
+<?php endif; ?>
     </div>
   </header>
 
@@ -358,83 +420,21 @@
         </div>
 
         <div class="grid" id="grid">
-          <a class="card reveal" style="--c:#2b8cff" href="https://zabedu.ru/" target="_blank" rel="noopener" data-groups="teacher staff">
+<?php foreach ($ecoServices as $s): if ($s['key'] === 'vitrina') { continue; } $internal = !empty($s['internal']); ?>
+          <a class="card reveal<?= $internal ? ' card--home' : '' ?>" style="--c:<?= $h($s['color']) ?>" href="<?= $h(planner_ecosystem_service_url($s)) ?>"<?= $internal ? '' : ' target="_blank" rel="noopener"' ?> data-groups="<?= $h($s['groups']) ?>">
             <div class="card-top">
-              <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>
+              <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><?= $s['icon'] ?></svg></span>
+              <?php if ($internal): ?><span class="here">Вы на этом сайте</span><?php endif; ?>
               <span class="arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg></span>
             </div>
             <div>
-              <h3>Образовательный портал</h3>
-              <div class="domain">zabedu.ru</div>
+              <h3><?= $h($s['name']) ?></h3>
+              <div class="domain"><?= $h($s['domain']) ?></div>
             </div>
-            <p>Портал образования Забайкальского края: новости, организации по районам, контакты, почта и общие сервисы для школ и детских садов.</p>
-            <div class="tags"><span>Для всех</span><span>Новости</span><span>Организации</span></div>
+            <p><?= $h($s['desc']) ?></p>
+            <div class="tags"><?php foreach ($s['tags'] as $tag): ?><span><?= $h($tag) ?></span><?php endforeach; ?></div>
           </a>
-
-          <a class="card reveal" style="--c:#8b5cf6" href="https://do75.zabedu.ru/" target="_blank" rel="noopener" data-groups="teacher learn">
-            <div class="card-top">
-              <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 9L12 4 2 9l10 5 10-5z"/><path d="M6 11v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/><path d="M22 9v6"/></svg></span>
-              <span class="arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg></span>
-            </div>
-            <div>
-              <h3>Дистанционное обучение</h3>
-              <div class="domain">do75.zabedu.ru</div>
-            </div>
-            <p>Дистанционная образовательная платформа ИРО: курсы повышения квалификации, учебные материалы, задания и тесты в личном кабинете слушателя.</p>
-            <div class="tags"><span>Педагогам</span><span>Курсы</span><span>Онлайн</span></div>
-          </a>
-
-          <a class="card reveal" style="--c:#f59e0b" href="https://metodnav.zabedu.ru/" target="_blank" rel="noopener" data-groups="teacher learn">
-            <div class="card-top">
-              <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg></span>
-              <span class="arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg></span>
-            </div>
-            <div>
-              <h3>Методический навигатор</h3>
-              <div class="domain">metodnav.zabedu.ru</div>
-            </div>
-            <p>Методическая поддержка педагогов: материалы, рекомендации и ориентиры для профессионального развития и подготовки к занятиям.</p>
-            <div class="tags"><span>Педагогам</span><span>Методика</span></div>
-          </a>
-
-          <a class="card reveal" style="--c:#ef4f6b" href="https://konkurs.zabedu.ru/" target="_blank" rel="noopener" data-groups="teacher events">
-            <div class="card-top">
-              <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg></span>
-              <span class="arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg></span>
-            </div>
-            <div>
-              <h3>Конкурсы и проекты</h3>
-              <div class="domain">konkurs.zabedu.ru</div>
-            </div>
-            <p>Система сопровождения мероприятий и социально значимых проектов края: категории конкурсов, объявления, приём и рассмотрение заявок.</p>
-            <div class="tags"><span>Педагогам</span><span>Конкурсы</span><span>Заявки</span></div>
-          </a>
-
-          <a class="card reveal" style="--c:#2fc06e" href="https://planiro75.ru/" target="_blank" rel="noopener" data-groups="staff">
-            <div class="card-top">
-              <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18"/><path d="M8.5 15l2.2 2.2L15.5 13"/></svg></span>
-              <span class="arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg></span>
-            </div>
-            <div>
-              <h3>Планировщик</h3>
-              <div class="domain">planiro75.ru</div>
-            </div>
-            <p>Задачи, проекты и отчёты подразделений, индивидуальный план и отчёт преподавателя, документы института и уведомления в MAX.</p>
-            <div class="tags"><span>Сотрудникам ИРО</span><span>Задачи</span><span>Отчёты</span></div>
-          </a>
-
-          <a class="card reveal" style="--c:#14b8a6" href="https://af.zabedu.ru/" target="_blank" rel="noopener" data-groups="staff learn">
-            <div class="card-top">
-              <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-5h6v5"/><path d="M9 10h.01M15 10h.01"/></svg></span>
-              <span class="arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg></span>
-            </div>
-            <div>
-              <h3>Аудиторный фонд</h3>
-              <div class="domain">af.zabedu.ru</div>
-            </div>
-            <p>Учёт помещений и расписания занятий института. Занятость аудиторий можно посмотреть без входа, остальные возможности — после входа.</p>
-            <div class="tags"><span>Сотрудникам ИРО</span><span>Аудитории</span><span>Расписание</span></div>
-          </a>
+<?php endforeach; ?>
         </div>
         <p class="empty" id="empty">В этой группе пока нет сервисов.</p>
       </div>
@@ -462,7 +462,7 @@
             <h3>Сотруднику ИРО</h3>
             <p>Планировать работу и готовить мероприятия.</p>
             <ol>
-              <li><span>Ведите задачи и отчёты в <a href="https://planiro75.ru/" target="_blank" rel="noopener">Планировщике</a></span></li>
+              <li><span>Ведите задачи и отчёты в <a href="<?= $h($vectorUrl) ?>">«<?= $h($vectorName) ?>»</a></span></li>
               <li><span>Посмотрите занятость помещений в <a href="https://af.zabedu.ru/" target="_blank" rel="noopener">аудиторном фонде</a></span></li>
               <li><span>Проверьте анонс события на <a href="https://eventt.zabedu.ru/" target="_blank" rel="noopener">витрине</a></span></li>
             </ol>
@@ -490,15 +490,7 @@
 
   <script>
     (function () {
-      var services = [
-        { name: 'Портал', dom: 'zabedu.ru', url: 'https://zabedu.ru/' },
-        { name: 'Обучение', dom: 'do75', url: 'https://do75.zabedu.ru/' },
-        { name: 'Навигатор', dom: 'metodnav', url: 'https://metodnav.zabedu.ru/' },
-        { name: 'Конкурсы', dom: 'konkurs', url: 'https://konkurs.zabedu.ru/' },
-        { name: 'Витрина', dom: 'eventt', url: 'https://eventt.zabedu.ru/' },
-        { name: 'Аудитории', dom: 'af', url: 'https://af.zabedu.ru/' },
-        { name: 'Планировщик', dom: 'planiro75.ru', url: 'https://planiro75.ru/' }
-      ];
+      var services = <?= $orbitJson ?>;
       var NS = 'http://www.w3.org/2000/svg';
       var spokes = document.getElementById('spokes');
       var nodes = document.getElementById('nodes');
@@ -512,8 +504,8 @@
         var a = -Math.PI / 2 + i * (2 * Math.PI / services.length);
         var x = 250 + 180 * Math.cos(a), y = 250 + 180 * Math.sin(a);
         el('line', { 'class': 'spoke', x1: 250, y1: 250, x2: x.toFixed(1), y2: y.toFixed(1) }, spokes);
-        var g = el('g', { 'class': 'node' }, nodes);
-        var link = el('a', { href: s.url, target: '_blank', rel: 'noopener' }, g);
+        var g = el('g', { 'class': s.internal ? 'node node--home' : 'node' }, nodes);
+        var link = el('a', s.internal ? { href: s.url } : { href: s.url, target: '_blank', rel: 'noopener' }, g);
         el('title', {}, link).textContent = s.name + ' — ' + s.url;
         el('circle', { cx: x.toFixed(1), cy: y.toFixed(1), r: 42 }, link);
         var t = el('text', { x: x.toFixed(1), y: (y - 1).toFixed(1) }, link);

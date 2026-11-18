@@ -7,10 +7,11 @@ declare(strict_types=1);
  */
 function layout_start(array $user, string $title, string $active = 'dashboard'): void
 {
+    require_once __DIR__ . '/ecosystem.php';
     $rootJson = json_encode(planner_app_root(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
     $userIdJson = json_encode((int) $user['id'], JSON_THROW_ON_ERROR);
     $cfgName = trim((string) app_config()['app']['name']);
-    $app = htmlspecialchars($cfgName !== '' ? $cfgName : 'Planner', ENT_QUOTES, 'UTF-8');
+    $app = htmlspecialchars($cfgName !== '' ? $cfgName : 'Вектор', ENT_QUOTES, 'UTF-8');
     $name = htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8');
     $role = htmlspecialchars(role_label($user['role']), ENT_QUOTES, 'UTF-8');
     $org = htmlspecialchars($user['organization_name'], ENT_QUOTES, 'UTF-8');
@@ -22,10 +23,6 @@ function layout_start(array $user, string $title, string $active = 'dashboard'):
     $mayAdminNav = function_exists('user_may_manage_users') && user_may_manage_users($user);
     $mayPlanYearNav = function_exists('user_may_access_org_plan_console') && user_may_access_org_plan_console($user);
     $mayDeptTasksNav = function_exists('user_may_view_department_tasks_page') && user_may_view_department_tasks_page($user);
-    $logoLetter = function_exists('mb_substr')
-        ? mb_strtoupper(mb_substr($cfgName !== '' ? $cfgName : 'P', 0, 1, 'UTF-8'), 'UTF-8')
-        : strtoupper(substr($cfgName !== '' ? $cfgName : 'P', 0, 1));
-    $logoLetter = htmlspecialchars($logoLetter, ENT_QUOTES, 'UTF-8');
     ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -43,7 +40,7 @@ function layout_start(array $user, string $title, string $active = 'dashboard'):
 <body class="app-body bx-app">
 <div class="app-shell bx-shell">
   <aside class="bx-iconbar" aria-label="Разделы">
-    <div class="bx-ibar-logo" title="<?= $app ?>"><?= $logoLetter ?></div>
+    <a class="bx-ibar-logo" href="<?= $url('/index.php') ?>" title="<?= $app ?>" aria-label="<?= $app ?> — обзор"><?= planner_vector_mark_svg(36) ?></a>
     <a class="bx-ibar-item<?= $active === 'dashboard' ? ' is-active' : '' ?>" href="<?= $url('/index.php') ?>" title="Обзор">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>
     </a>
@@ -112,6 +109,7 @@ function layout_start(array $user, string $title, string $active = 'dashboard'):
         <input type="search" id="globalSearch" placeholder="Поиск задач, проектов, людей…" autocomplete="off" aria-label="Поиск по задачам и проектам">
       </div>
       <div class="bx-topnav-actions">
+        <?= planner_ecosystem_launcher_html() ?>
         <a class="bx-topnav-notif" href="<?= htmlspecialchars(planner_url('/notifications.php'), ENT_QUOTES, 'UTF-8') ?>" title="Уведомления" aria-label="Уведомления">
           <img class="bx-topnav-notif-icon" src="<?= htmlspecialchars(planner_url('/assets/img/notification-bell.png'), ENT_QUOTES, 'UTF-8') ?>" alt="" aria-hidden="true">
           <span class="bx-rail-badge" id="bxNotifBadge" hidden></span>
@@ -188,7 +186,7 @@ function layout_end(): void
     <p class="muted profile-org-year-hint">
       1) Откройте чат-бота:
       <a href="https://max.ru/irozabkrai75_bot" target="_blank" rel="noopener noreferrer">@irozabkrai75_bot</a>,
-      начните диалог и скопируйте ID чата. 2) Вставьте ID в поле ниже — в этот чат будут приходить уведомления Planner.
+      начните диалог и скопируйте ID чата. 2) Вставьте ID в поле ниже — в этот чат будут приходить уведомления Вектора.
       Если поле пустое, уведомления не отправляются.
     </p>
     <label class="field-label" for="profileMaxChatId">ID чата MAX</label>
@@ -215,6 +213,7 @@ function layout_end(): void
 <script src="<?= htmlspecialchars(planner_url('/assets/js/app.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <script src="<?= htmlspecialchars(planner_url('/assets/js/notifications_badge.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <script src="<?= htmlspecialchars(planner_url('/assets/js/profile_menu.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
+<script src="<?= htmlspecialchars(planner_url('/assets/js/ecosystem_launcher.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </body>
 </html>
 <?php
