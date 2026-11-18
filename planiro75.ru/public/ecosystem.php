@@ -90,6 +90,14 @@ header('Content-Type: text/html; charset=UTF-8');
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Экосистема ИРО — рабочие сервисы сотрудников</title>
+  <script>
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('eco-theme'); } catch (e) {}
+      if (t !== 'light' && t !== 'dark') t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
   <meta name="description" content="Цифровые сервисы Института развития образования Забайкальского края: портал, обучение, конкурсы, мероприятия, методическая поддержка и планирование работы.">
   <meta property="og:title" content="Экосистема ИРО Забайкальского края">
   <meta property="og:description" content="Все цифровые сервисы института в одном месте.">
@@ -111,8 +119,20 @@ header('Content-Type: text/html; charset=UTF-8');
       --font: "Segoe UI", system-ui, -apple-system, Roboto, Ubuntu, "Helvetica Neue", sans-serif;
       color-scheme: light dark;
     }
+    :root[data-theme="light"] { color-scheme: light; }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #0d1419;
+      --surface: #141e25;
+      --surface-2: #19252d;
+      --text: #e8eef2;
+      --muted: #93a4b1;
+      --line: rgba(255, 255, 255, 0.08);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+      --shadow-hover: 0 2px 4px rgba(0, 0, 0, 0.35), 0 18px 40px rgba(0, 0, 0, 0.45);
+    }
     @media (prefers-color-scheme: dark) {
-      :root {
+      :root:not([data-theme]) {
         --bg: #0d1419;
         --surface: #141e25;
         --surface-2: #19252d;
@@ -161,6 +181,18 @@ header('Content-Type: text/html; charset=UTF-8');
       transition: background .15s ease, transform .15s ease;
     }
     .top-link:hover { background: var(--primary-dark); }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .theme-btn {
+      display: grid; place-items: center; width: 38px; height: 38px; padding: 0;
+      border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--text);
+      cursor: pointer; box-shadow: var(--shadow); transition: transform .15s ease, border-color .15s ease, color .15s ease;
+    }
+    .theme-btn:hover { transform: translateY(-1px); border-color: rgba(47, 192, 110, 0.5); color: var(--primary-dark); }
+    .theme-btn:focus-visible { outline: 3px solid rgba(47, 192, 110, 0.6); outline-offset: 3px; }
+    .theme-btn .ico-sun { display: none; }
+    :root[data-theme="dark"] .theme-btn { color: #f5c451; }
+    :root[data-theme="dark"] .theme-btn .ico-sun { display: block; }
+    :root[data-theme="dark"] .theme-btn .ico-moon { display: none; }
     .top-link--vector { padding: 5px 16px 5px 5px; gap: 10px; box-shadow: 0 6px 18px rgba(47, 192, 110, 0.3); }
     .top-link--vector:hover { transform: translateY(-1px); }
     .top-link-mark { display: block; border-radius: 999px; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55); }
@@ -180,7 +212,7 @@ header('Content-Type: text/html; charset=UTF-8');
       background: rgba(47, 192, 110, 0.12); color: var(--primary-dark);
       font-size: 0.82rem; font-weight: 600;
     }
-    @media (prefers-color-scheme: dark) { .eyebrow { color: #6fe0a0; } }
+    :root[data-theme="dark"] .eyebrow { color: #6fe0a0; }
     .eyebrow::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 4px rgba(47, 192, 110, 0.2); }
     h1 {
       margin: 18px 0 16px;
@@ -340,7 +372,7 @@ header('Content-Type: text/html; charset=UTF-8');
       background: color-mix(in srgb, var(--c) 14%, transparent); color: var(--primary-dark);
       font-size: 0.74rem; font-weight: 700;
     }
-    @media (prefers-color-scheme: dark) { .card-top .here { color: #6fe0a0; } }
+    :root[data-theme="dark"] .card-top .here { color: #6fe0a0; }
     .card--home { border-color: color-mix(in srgb, var(--c) 45%, transparent); }
     .icon {
       width: 52px; height: 52px; border-radius: 15px; display: grid; place-items: center;
@@ -421,6 +453,11 @@ header('Content-Type: text/html; charset=UTF-8');
         </svg>
         <span>ИРО Забайкальского края<small>Цифровая экосистема</small></span>
       </a>
+      <div class="top-actions">
+      <button type="button" class="theme-btn" id="themeBtn" aria-label="Тёмная тема" title="Тёмная тема">
+        <svg class="ico-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="ico-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
 <?php if ($ecoUser): ?>
       <a class="top-link top-link--vector" href="<?= $h($vectorUrl) ?>" title="Открыть <?= $h($vectorName) ?>">
         <?= planner_vector_mark_svg(26, 'top-link-mark') ?>
@@ -433,6 +470,7 @@ header('Content-Type: text/html; charset=UTF-8');
         <span>Войти в <?= $h($vectorName) ?></span>
       </a>
 <?php endif; ?>
+      </div>
     </div>
   </header>
 
@@ -633,6 +671,33 @@ header('Content-Type: text/html; charset=UTF-8');
 
   <script>
     (function () {
+      var root = document.documentElement;
+      var themeBtn = document.getElementById('themeBtn');
+      var themeMeta = document.querySelector('meta[name="theme-color"]');
+      function applyTheme(t) {
+        root.setAttribute('data-theme', t);
+        var label = t === 'dark' ? 'Светлая тема' : 'Тёмная тема';
+        themeBtn.setAttribute('aria-label', label);
+        themeBtn.setAttribute('title', label);
+        themeBtn.setAttribute('aria-pressed', t === 'dark' ? 'true' : 'false');
+        if (themeMeta) themeMeta.setAttribute('content', t === 'dark' ? '#0d1419' : '#2fc06e');
+      }
+      applyTheme(root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
+      themeBtn.addEventListener('click', function () {
+        var t = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        applyTheme(t);
+        try { localStorage.setItem('eco-theme', t); } catch (e) {}
+      });
+      if (window.matchMedia) {
+        var mq = matchMedia('(prefers-color-scheme: dark)');
+        var onSys = function (e) {
+          var saved = null;
+          try { saved = localStorage.getItem('eco-theme'); } catch (err) {}
+          if (saved !== 'light' && saved !== 'dark') applyTheme(e.matches ? 'dark' : 'light');
+        };
+        if (mq.addEventListener) mq.addEventListener('change', onSys); else if (mq.addListener) mq.addListener(onSys);
+      }
+
       var services = <?= $orbitJson ?>;
       var NS = 'http://www.w3.org/2000/svg';
       var spokes = document.getElementById('spokes');
