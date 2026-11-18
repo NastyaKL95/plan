@@ -325,10 +325,10 @@ header('Content-Type: text/html; charset=UTF-8');
       padding: 24px; border-radius: var(--radius); text-decoration: none;
       background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow);
       transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease, opacity .2s ease;
-      min-height: 250px;
+      min-height: 250px; overflow: hidden; isolation: isolate;
     }
     .card::before {
-      content: ""; position: absolute; inset: 0 0 auto 0; height: 4px; border-radius: var(--radius) var(--radius) 0 0;
+      content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
       background: var(--c); opacity: 0; transition: opacity .2s ease;
     }
     .card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); border-color: color-mix(in srgb, var(--c) 40%, transparent); }
@@ -597,7 +597,6 @@ header('Content-Type: text/html; charset=UTF-8');
             <ol>
               <li><span>Отметьте в задаче «Учебную работу» и часы — они попадут в план и отчёт</span></li>
               <li><span>Разместите курс на <a href="https://do75.zabedu.ru/" target="_blank" rel="noopener">дистанционной платформе</a></span></li>
-              <li><span>Добавьте материалы в <a href="https://metodnav.zabedu.ru/" target="_blank" rel="noopener">методический навигатор</a></span></li>
             </ol>
           </div>
           <div class="path reveal">
