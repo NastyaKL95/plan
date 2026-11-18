@@ -155,7 +155,7 @@ function planner_maintenance_render_page(int $orgId, bool $loggedIn): void
     $title = htmlspecialchars('Техническое обслуживание', ENT_QUOTES, 'UTF-8');
     $appEsc = htmlspecialchars($app, ENT_QUOTES, 'UTF-8');
     $textEsc = nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
-    $css = htmlspecialchars(planner_url('/assets/css/app.css'), ENT_QUOTES, 'UTF-8');
+    $css = htmlspecialchars(planner_asset_url('/assets/css/app.css'), ENT_QUOTES, 'UTF-8');
     $logout = htmlspecialchars(planner_url('/logout.php'), ENT_QUOTES, 'UTF-8');
     $login = htmlspecialchars(planner_url('/login.php'), ENT_QUOTES, 'UTF-8');
     echo '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">';

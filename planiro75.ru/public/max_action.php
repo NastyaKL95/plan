@@ -124,7 +124,7 @@ function planner_max_action_page(string $title, string $message, int $status = 2
     http_response_code($status);
     $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
     $body = $messageIsHtml ? $message : '<p>' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</p>';
-    $css = htmlspecialchars(planner_url('/assets/css/app.css'), ENT_QUOTES, 'UTF-8');
+    $css = htmlspecialchars(planner_asset_url('/assets/css/app.css'), ENT_QUOTES, 'UTF-8');
     $appName = trim((string) (app_config()['app']['name'] ?? ''));
     $app = htmlspecialchars($appName !== '' ? $appName : 'Вектор', ENT_QUOTES, 'UTF-8');
     echo '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">'

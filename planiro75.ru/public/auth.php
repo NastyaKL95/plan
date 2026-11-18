@@ -290,7 +290,7 @@ $authEcoHref = htmlspecialchars(planner_ecosystem_url(), ENT_QUOTES, 'UTF-8');
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= $mode === 'register' ? 'Регистрация' : 'Авторизация' ?> — <?= $authAppName ?></title>
   <?= planner_favicon_head_markup() ?>
-  <link rel="stylesheet" href="<?= htmlspecialchars(planner_url('/assets/css/app.css'), ENT_QUOTES, 'UTF-8') ?>">
+  <link rel="stylesheet" href="<?= htmlspecialchars(planner_asset_url('/assets/css/app.css'), ENT_QUOTES, 'UTF-8') ?>">
   <script src="<?= htmlspecialchars(planner_url('/assets/js/bx-custom-select.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
 </head>
 <body class="auth-page" data-auth-mode="<?= htmlspecialchars($mode, ENT_QUOTES, 'UTF-8') ?>">

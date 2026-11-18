@@ -350,6 +350,15 @@ function planner_url(string $path): string
     return planner_app_root() . $path;
 }
 
+/** URL файла из public/ с меткой изменения, чтобы браузер не держал старую версию из кэша. */
+function planner_asset_url(string $path): string
+{
+    $path = '/' . ltrim($path, '/');
+    $mtime = @filemtime(dirname(__DIR__) . '/public' . $path);
+
+    return planner_url($path) . '?v=' . (string) ($mtime ?: 1);
+}
+
 /** HTML-теги link для favicon (SVG). */
 function planner_favicon_head_markup(): string
 {

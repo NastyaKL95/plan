@@ -171,7 +171,7 @@ a:hover {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 52px 50px 42px;
+  padding: 56px 50px 24px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -219,11 +219,14 @@ a:hover {
 }
 
 .auth-eco-back {
+  position: absolute;
+  top: 18px;
+  left: 50px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 22px;
-  padding: 6px 12px 6px 9px;
+  padding: 5px 12px 5px 9px;
+  line-height: 1.2;
   border-radius: 999px;
   background: rgba(47, 192, 110, 0.1);
   color: #1f9a55;
@@ -422,6 +425,10 @@ a:hover {
     padding: 36px 24px 30px;
   }
   .auth-form-screen { max-width: none; }
+  .auth-eco-back {
+    position: static;
+    margin-bottom: 18px;
+  }
   .auth-panel--visual {
     position: static;
     left: auto;
