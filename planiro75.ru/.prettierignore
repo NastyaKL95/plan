@@ -1,0 +1,5 @@
+storage/
+var/
+public/assets/img/
+public/assets/icons/
+*.min.js
