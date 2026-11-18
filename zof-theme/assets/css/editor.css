@@ -1,0 +1,40 @@
+/* Редактор блоков: шрифты и заголовки как на сайте. Шрифты подключаются из theme.json. */
+
+body {
+  color: #17261c;
+  font-family: 'Golos Text', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  font-size: 1.0625rem;
+  line-height: 1.65;
+}
+
+h1,
+h2,
+h3 {
+  color: #0f4f25;
+  font-family: Oswald, 'Arial Narrow', sans-serif;
+  font-weight: 600;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+h4,
+h5,
+h6 {
+  color: #0f4f25;
+  font-weight: 700;
+}
+
+a {
+  color: #1b7a3a;
+}
+
+ul li::marker {
+  color: #d62a2f;
+}
+
+blockquote {
+  padding: 16px 20px;
+  border-left: 5px solid #f5c218;
+  border-radius: 0 16px 16px 0;
+  background: #fbf3df;
+}
